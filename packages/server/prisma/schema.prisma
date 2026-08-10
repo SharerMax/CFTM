@@ -1,0 +1,40 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Tunnel {
+  id                 String   @id @default(cuid())
+  name               String
+  cloudflareTunnelId String?  @unique
+  encryptedToken     String?
+  accountId          String
+  status             String   @default("stopped")
+  config             String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  dnsRecords         DnsRecord[]
+}
+
+model DnsRecord {
+  id                 String   @id @default(cuid())
+  cloudflareRecordId String?  @unique
+  zoneId             String
+  name               String
+  type               String
+  content            String
+  proxied            Boolean  @default(true)
+  tunnelId           String?
+  tunnel             Tunnel?  @relation(fields: [tunnelId], references: [id])
+  createdAt          DateTime @default(now())
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

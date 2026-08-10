@@ -1,0 +1,31 @@
+{
+  "name": "@cftm/server",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node --import tsx --watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/src/index.js",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@cftm/shared": "workspace:*",
+    "@hono/node-server": "catalog:",
+    "@prisma/adapter-better-sqlite3": "catalog:",
+    "@prisma/client": "catalog:",
+    "better-sqlite3": "catalog:",
+    "dotenv": "catalog:",
+    "hono": "catalog:",
+    "yaml": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "prisma": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}

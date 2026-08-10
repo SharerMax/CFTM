@@ -13,6 +13,13 @@ export interface CfTunnel {
   created_at: string
   deleted_at: string | null
   connections: { colo_name: string, uuid: string, is_pending_reconnect: boolean }[]
+  config_src?: 'local' | 'cloudflare'
+}
+
+export interface CfTunnelConfig {
+  'ingress': { hostname?: string, service: string, path?: string, originRequest?: Record<string, unknown> }[]
+  'originRequest'?: Record<string, unknown>
+  'warp-routing'?: { enabled: boolean }
 }
 
 export interface CfZone {
@@ -82,6 +89,24 @@ export class CloudflareApi {
       `/accounts/${accountId}/cfd_tunnel/${tunnelId}/token`,
     )
     return result.token
+  }
+
+  async getTunnelConfig(accountId: string, tunnelId: string): Promise<CfTunnelConfig> {
+    const result = await this.request<{ config: CfTunnelConfig }>(
+      `/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`,
+    )
+    return result.config
+  }
+
+  async updateTunnelConfig(accountId: string, tunnelId: string, config: CfTunnelConfig): Promise<CfTunnelConfig> {
+    const result = await this.request<{ config: CfTunnelConfig }>(
+      `/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ config }),
+      },
+    )
+    return result.config
   }
 
   async listDnsRecords(zoneId: string): Promise<CfDnsRecord[]> {

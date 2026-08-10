@@ -1,212 +1,190 @@
-import { decrypt, encrypt } from '@cftm/shared/crypto'
+import type { CfTunnelConfig } from '../services/cloudflare'
 import { createTunnelSchema, updateConfigSchema } from '@cftm/shared/schemas'
 import { Hono } from 'hono'
-import { prisma } from '../prisma'
-import { CloudflareApi } from '../services/cloudflare'
-import { tunnelManager } from '../services/tunnel'
+import { TunnelError, TunnelService } from '../services/tunnels'
 import { getCfTokenAsync } from './auth'
 
 export const tunnelRoutes = new Hono()
 
+function handleError(c: any, e: unknown) {
+  if (e instanceof TunnelError)
+    return c.json({ error: e.message }, e.status)
+  throw e
+}
+
+function getAccountId(c: any): string | null {
+  return c.req.query('accountId') || null
+}
+
 tunnelRoutes.get('/', async (c) => {
   const token = await getCfTokenAsync()
-  if (!token) {
+  if (!token)
     return c.json({ error: 'not_authorized' }, 401)
+
+  const tunnels = await new TunnelService(token).list()
+  return c.json(tunnels)
+})
+
+tunnelRoutes.get('/remote', async (c) => {
+  const token = await getCfTokenAsync()
+  if (!token)
+    return c.json({ error: 'not_authorized' }, 401)
+
+  const accountId = getAccountId(c)
+  if (!accountId)
+    return c.json({ error: 'bad_request', message: 'accountId is required' }, 400)
+
+  const service = new TunnelService(token)
+  const cfTunnels = await service.listRemote(accountId)
+
+  return c.json(cfTunnels)
+})
+
+tunnelRoutes.get('/remote/config', async (c) => {
+  const token = await getCfTokenAsync()
+  if (!token)
+    return c.json({ error: 'not_authorized' }, 401)
+
+  const accountId = getAccountId(c)
+  const tunnelId = c.req.query('tunnelId')
+  if (!accountId || !tunnelId)
+    return c.json({ error: 'bad_request', message: 'accountId and tunnelId are required' }, 400)
+
+  try {
+    const config = await new TunnelService(token).getRemoteConfig(accountId, tunnelId)
+    return c.json(config)
   }
+  catch (e) {
+    return handleError(c, e)
+  }
+})
 
-  const tunnels = await prisma.tunnel.findMany({
-    include: { dnsRecords: true },
-    orderBy: { createdAt: 'desc' },
-  })
+tunnelRoutes.put('/remote/config', async (c) => {
+  const token = await getCfTokenAsync()
+  if (!token)
+    return c.json({ error: 'not_authorized' }, 401)
 
-  return c.json(tunnels.map(t => ({
-    ...t,
-    config: JSON.parse(t.config),
-    isRunning: tunnelManager.isRunning(t.id),
-  })))
+  const accountId = getAccountId(c)
+  const tunnelId = c.req.query('tunnelId')
+  if (!accountId || !tunnelId)
+    return c.json({ error: 'bad_request', message: 'accountId and tunnelId are required' }, 400)
+
+  const body = await c.req.json()
+  const config = body.config as CfTunnelConfig
+
+  try {
+    const result = await new TunnelService(token).updateRemoteConfig(accountId, tunnelId, config)
+    return c.json(result)
+  }
+  catch (e) {
+    return handleError(c, e)
+  }
 })
 
 tunnelRoutes.post('/', async (c) => {
   const token = await getCfTokenAsync()
-  if (!token) {
+  if (!token)
     return c.json({ error: 'not_authorized' }, 401)
-  }
 
   const body = await c.req.json()
   const input = createTunnelSchema.parse(body)
 
-  const cf = new CloudflareApi(token)
-  const cfTunnel = await cf.createTunnel(input.accountId, input.name)
-  const tunnelToken = await cf.getTunnelToken(input.accountId, cfTunnel.id)
-
-  const tunnel = await prisma.tunnel.create({
-    data: {
-      name: input.name,
-      accountId: input.accountId,
-      cloudflareTunnelId: cfTunnel.id,
-      encryptedToken: encrypt(tunnelToken),
-      status: 'stopped',
-      config: JSON.stringify({
-        'tunnel': cfTunnel.id,
-        'credentials-file': '',
-        'ingress': [],
-      }),
-    },
-  })
-
-  return c.json({
-    ...tunnel,
-    config: JSON.parse(tunnel.config),
-    isRunning: false,
-  })
+  try {
+    const tunnel = await new TunnelService(token).create(input)
+    return c.json(tunnel)
+  }
+  catch (e) {
+    return handleError(c, e)
+  }
 })
 
 tunnelRoutes.get('/:id', async (c) => {
   const token = await getCfTokenAsync()
-  if (!token) {
+  if (!token)
     return c.json({ error: 'not_authorized' }, 401)
+
+  try {
+    const tunnel = await new TunnelService(token).get(c.req.param('id'))
+    return c.json(tunnel)
   }
-
-  const id = c.req.param('id')
-  const tunnel = await prisma.tunnel.findUnique({
-    where: { id },
-    include: { dnsRecords: true },
-  })
-
-  if (!tunnel) {
-    return c.json({ error: 'not_found' }, 404)
+  catch (e) {
+    return handleError(c, e)
   }
-
-  const status = tunnelManager.getStatus(id)
-
-  return c.json({
-    ...tunnel,
-    config: JSON.parse(tunnel.config),
-    isRunning: tunnelManager.isRunning(id),
-    runtimeStatus: status?.status || tunnel.status,
-  })
 })
 
 tunnelRoutes.put('/:id/config', async (c) => {
   const token = await getCfTokenAsync()
-  if (!token) {
+  if (!token)
     return c.json({ error: 'not_authorized' }, 401)
-  }
 
   const id = c.req.param('id')
   const body = await c.req.json()
   const config = updateConfigSchema.parse(body)
 
-  const tunnel = await prisma.tunnel.findUnique({ where: { id } })
-  if (!tunnel) {
-    return c.json({ error: 'not_found' }, 404)
+  try {
+    await new TunnelService(token).updateConfig(id, config)
+    return c.json({ success: true })
   }
-
-  await prisma.tunnel.update({
-    where: { id },
-    data: { config: JSON.stringify(config) },
-  })
-
-  return c.json({ success: true })
+  catch (e) {
+    return handleError(c, e)
+  }
 })
 
 tunnelRoutes.post('/:id/start', async (c) => {
   const token = await getCfTokenAsync()
-  if (!token) {
+  if (!token)
     return c.json({ error: 'not_authorized' }, 401)
-  }
-
-  const id = c.req.param('id')
-  const tunnel = await prisma.tunnel.findUnique({ where: { id } })
-
-  if (!tunnel) {
-    return c.json({ error: 'not_found' }, 404)
-  }
-
-  if (tunnelManager.isRunning(id)) {
-    return c.json({ error: 'already_running' }, 400)
-  }
 
   try {
-    const config = JSON.parse(tunnel.config)
-    const tunnelToken = decrypt(tunnel.encryptedToken!)
-    await tunnelManager.start(id, config, tunnelToken)
-
-    await prisma.tunnel.update({
-      where: { id },
-      data: { status: 'running' },
-    })
-
+    await new TunnelService(token).start(c.req.param('id'))
     return c.json({ success: true, status: 'running' })
   }
   catch (e) {
-    await prisma.tunnel.update({
-      where: { id },
-      data: { status: 'error' },
-    })
-    return c.json({ error: (e as Error).message }, 500)
+    return handleError(c, e)
   }
 })
 
 tunnelRoutes.post('/:id/stop', async (c) => {
   const token = await getCfTokenAsync()
-  if (!token) {
+  if (!token)
     return c.json({ error: 'not_authorized' }, 401)
+
+  try {
+    await new TunnelService(token).stop(c.req.param('id'))
+    return c.json({ success: true, status: 'stopped' })
   }
-
-  const id = c.req.param('id')
-
-  const stopped = tunnelManager.stop(id)
-  if (!stopped) {
-    return c.json({ error: 'not_running' }, 400)
+  catch (e) {
+    return handleError(c, e)
   }
-
-  await prisma.tunnel.update({
-    where: { id },
-    data: { status: 'stopped' },
-  })
-
-  return c.json({ success: true, status: 'stopped' })
 })
 
 tunnelRoutes.get('/:id/logs', async (c) => {
   const token = await getCfTokenAsync()
-  if (!token) {
+  if (!token)
     return c.json({ error: 'not_authorized' }, 401)
-  }
 
   const id = c.req.param('id')
-  const tunnel = await prisma.tunnel.findUnique({ where: { id } })
-
-  if (!tunnel) {
-    return c.json({ error: 'not_found' }, 404)
-  }
 
   c.header('Content-Type', 'text/event-stream')
   c.header('Cache-Control', 'no-cache')
   c.header('Connection', 'keep-alive')
 
+  const service = new TunnelService(token)
+
   const stream = new ReadableStream({
     start(controller) {
-      const send = (data: string) => {
-        controller.enqueue(`data: ${data}\n\n`)
-      }
+      const send = (data: string) => controller.enqueue(`data: ${data}\n\n`)
 
-      const logs = tunnelManager.getLogs(id)
-      for (const log of logs) {
+      for (const log of service.getLogs(id))
         send(log)
-      }
 
-      const onLog = (entry: string) => send(entry)
-      tunnelManager.on(`log:${id}`, onLog)
+      const unsubscribe = service.onLog(id, send)
 
-      const interval = setInterval(() => {
-        send(': keepalive\n')
-      }, 30000)
+      const interval = setInterval(send, 30000, ': keepalive\n')
 
       c.req.raw.signal.addEventListener('abort', () => {
         clearInterval(interval)
-        tunnelManager.off(`log:${id}`, onLog)
+        unsubscribe()
       })
     },
   })
@@ -216,27 +194,14 @@ tunnelRoutes.get('/:id/logs', async (c) => {
 
 tunnelRoutes.delete('/:id', async (c) => {
   const token = await getCfTokenAsync()
-  if (!token) {
+  if (!token)
     return c.json({ error: 'not_authorized' }, 401)
+
+  try {
+    await new TunnelService(token).remove(c.req.param('id'))
+    return c.json({ success: true })
   }
-
-  const id = c.req.param('id')
-  const tunnel = await prisma.tunnel.findUnique({ where: { id } })
-
-  if (!tunnel) {
-    return c.json({ error: 'not_found' }, 404)
+  catch (e) {
+    return handleError(c, e)
   }
-
-  if (tunnelManager.isRunning(id)) {
-    tunnelManager.stop(id)
-  }
-
-  if (tunnel.cloudflareTunnelId) {
-    const cf = new CloudflareApi(token)
-    await cf.deleteTunnel(tunnel.accountId, tunnel.cloudflareTunnelId)
-  }
-
-  await prisma.tunnel.delete({ where: { id } })
-
-  return c.json({ success: true })
 })

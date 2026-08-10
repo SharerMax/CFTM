@@ -102,7 +102,7 @@ Both are configured in `opencode.json` (project-level).
 Install all recommended skills with one command:
 
 ```bash
-npx skills add -g -y \
+pnpx skills add \
   antfu/skills@antfu \
   antfu/skills@antfu-design \
   github/awesome-copilot@git-commit \

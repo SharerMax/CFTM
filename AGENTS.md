@@ -93,7 +93,7 @@ Prisma + SQLite (Prisma v7). Schema at `packages/server/prisma/schema.prisma`.
 ## Git Commits
 
 - Split commits by sub-project: each change to `packages/shared`, `packages/client`, `packages/server` gets its own commit
-- Commit order: `shared` → `client` → `server`
+- Commit order: `shared` → `server` → `client`
 - Documentation updates (`AGENTS.md`, `*.md`, etc.) committed as a separate `docs` commit
 - Dependency/version updates use `chore` scope (e.g. `chore(client): add yaml dependency`)
 - Commit messages in English, conventional format (`feat`, `fix`, `docs`, `chore`, `refactor`, ...)

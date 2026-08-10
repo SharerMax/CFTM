@@ -96,3 +96,26 @@ This project is built using the following opencode skills. Install them for AI-a
 | `cloudflare-docs`  | Query Cloudflare Tunnel / API documentation       |
 
 Both are configured in `opencode.json` (project-level).
+
+### Quick Install
+
+Install all recommended skills with one command:
+
+```bash
+npx skills add -g -y \
+  antfu/skills@antfu \
+  antfu/skills@antfu-design \
+  github/awesome-copilot@git-commit \
+  jiaiyan/naive-ui-skills@naive-ui-skills \
+  antfu/skills@pinia \
+  antfu/skills@pnpm \
+  prisma/skills@prisma-cli \
+  prisma/skills@prisma-client-api \
+  antfu/skills@unocss \
+  antfu/skills@vite \
+  antfu/skills@vue \
+  antfu/skills@vue-best-practices \
+  antfu/skills@vue-router-best-practices \
+  antfu/skills@vueuse-functions \
+  antfu/skills@vitest
+```

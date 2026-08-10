@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "types": ["node", "unplugin-icons/types/vue"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.vue", "vite.config.ts", "uno.config.ts", "vite-env.d.ts"]
+}

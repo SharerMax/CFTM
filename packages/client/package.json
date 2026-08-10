@@ -1,0 +1,45 @@
+{
+  "name": "@cftm/client",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@cftm/shared": "workspace:*",
+    "@codemirror/autocomplete": "catalog:",
+    "@codemirror/commands": "catalog:",
+    "@codemirror/lang-json": "catalog:",
+    "@codemirror/lang-yaml": "catalog:",
+    "@codemirror/language": "catalog:",
+    "@codemirror/lint": "catalog:",
+    "@codemirror/search": "catalog:",
+    "@codemirror/state": "catalog:",
+    "@codemirror/theme-one-dark": "catalog:",
+    "@codemirror/view": "catalog:",
+    "codemirror": "catalog:",
+    "pinia": "catalog:",
+    "vue": "catalog:",
+    "vue-router": "catalog:"
+  },
+  "devDependencies": {
+    "@iconify-json/mdi": "catalog:",
+    "@types/node": "catalog:",
+    "@unocss/preset-attributify": "catalog:",
+    "@unocss/preset-icons": "catalog:",
+    "@unocss/preset-uno": "catalog:",
+    "@unocss/vite": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "naive-ui": "catalog:",
+    "typescript": "catalog:",
+    "unocss": "catalog:",
+    "unplugin-icons": "catalog:",
+    "vite": "catalog:",
+    "vue-tsc": "catalog:",
+    "yaml": "catalog:"
+  }
+}

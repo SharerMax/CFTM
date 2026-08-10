@@ -97,6 +97,8 @@ Prisma + SQLite (Prisma v7). Schema at `packages/server/prisma/schema.prisma`.
 - Documentation updates (`AGENTS.md`, `*.md`, etc.) committed as a separate `docs` commit
 - Dependency/version updates use `chore` scope (e.g. `chore(client): add yaml dependency`)
 - Commit messages in English, conventional format (`feat`, `fix`, `docs`, `chore`, `refactor`, ...)
+- **Subject**: one line, imperative mood, present tense, ≤72 chars
+- **Body**: blank line after subject, then a `-` bullet list of the specific changes; **required** unless the commit is a simple single-line change
 
 ## Prerequisites
 

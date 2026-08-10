@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.DS_Store
+*.local
+*.tsbuildinfo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Prisma
+packages/server/prisma/data.db
+packages/server/prisma/data.db-journal
+packages/server/generated/
+
+# Logs
+*.log
+
+# Generated
+packages/client/components.d.ts
+
+# Agent tooling
+.agents/
+.opencode/
+skills-lock.json

@@ -1,0 +1,23 @@
+{
+  "name": "cftm",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "prisma:generate": "pnpm -F @cftm/server exec prisma generate",
+    "prisma:migrate": "pnpm -F @cftm/server exec prisma migrate dev"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "catalog:",
+    "@unocss/eslint-plugin": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}

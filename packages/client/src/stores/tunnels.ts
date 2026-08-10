@@ -13,6 +13,20 @@ export interface Tunnel {
   createdAt: string
 }
 
+export interface RemoteTunnel {
+  id: string
+  name: string
+  created_at: string
+  deleted_at: string | null
+  config_src?: 'local' | 'cloudflare'
+}
+
+export interface RemoteConfig {
+  'ingress': { hostname?: string, service: string, path?: string, originRequest?: Record<string, unknown> }[]
+  'originRequest'?: Record<string, unknown>
+  'warp-routing'?: { enabled: boolean }
+}
+
 export const useTunnelStore = defineStore('tunnels', () => {
   const tunnels = ref<Tunnel[]>([])
   const loading = ref(false)
@@ -67,7 +81,32 @@ export const useTunnelStore = defineStore('tunnels', () => {
     return res
   }
 
-  return { tunnels, loading, error, fetchTunnels, fetchTunnel, createTunnel, deleteTunnel, startTunnel, stopTunnel }
+  async function listRemote(accountId: string) {
+    return await api.get<RemoteTunnel[]>('/tunnels/remote', { params: { accountId } })
+  }
+
+  async function getRemoteConfig(accountId: string, tunnelId: string) {
+    return await api.get<RemoteConfig>('/tunnels/remote/config', { params: { accountId, tunnelId } })
+  }
+
+  async function updateRemoteConfig(accountId: string, tunnelId: string, config: RemoteConfig) {
+    return await api.put<RemoteConfig>('/tunnels/remote/config', { config }, { params: { accountId, tunnelId } })
+  }
+
+  return {
+    tunnels,
+    loading,
+    error,
+    fetchTunnels,
+    fetchTunnel,
+    createTunnel,
+    deleteTunnel,
+    startTunnel,
+    stopTunnel,
+    listRemote,
+    getRemoteConfig,
+    updateRemoteConfig,
+  }
 })
 
 export function useTunnelStoreRefs() {

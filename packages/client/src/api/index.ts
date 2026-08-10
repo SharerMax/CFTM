@@ -1,7 +1,18 @@
 const BASE = '/api'
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+interface RequestConfig {
+  params?: Record<string, string>
+}
+
+function buildUrl(path: string, params?: Record<string, string>): string {
+  if (!params)
+    return `${BASE}${path}`
+  const qs = new URLSearchParams(params).toString()
+  return `${BASE}${path}?${qs}`
+}
+
+async function request<T>(path: string, init?: RequestInit, params?: Record<string, string>): Promise<T> {
+  const res = await fetch(buildUrl(path, params), {
     headers: { 'Content-Type': 'application/json' },
     ...init,
   })
@@ -15,8 +26,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
-  put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  get: <T>(path: string, config?: RequestConfig) => request<T>(path, undefined, config?.params),
+  post: <T>(path: string, body?: unknown, config?: RequestConfig) => request<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined }, config?.params),
+  put: <T>(path: string, body?: unknown, config?: RequestConfig) => request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }, config?.params),
+  delete: <T>(path: string, config?: RequestConfig) => request<T>(path, { method: 'DELETE' }, config?.params),
 }

@@ -69,7 +69,9 @@ const lintExtension = computed(() => {
 
 const langCompartment = new Compartment()
 const themeCompartment = new Compartment()
+const readOnlyCompartment = new Compartment()
 
+const readOnlyExtension = computed(() => (props.readOnly ? [EditorState.readOnly.of(true)] : []))
 const themeExtension = computed(() => (props.dark ? [oneDark] : []))
 
 const extensions = [
@@ -92,6 +94,7 @@ const extensions = [
     indentWithTab,
   ]),
   langCompartment.of([languageExtension.value, lintExtension.value]),
+  readOnlyCompartment.of(readOnlyExtension.value),
   EditorView.updateListener.of((update) => {
     if (update.docChanged) {
       emit('update:modelValue', update.state.doc.toString())
@@ -128,6 +131,12 @@ watch(() => props.language, () => {
 watch(() => props.dark, () => {
   view?.dispatch({
     effects: themeCompartment.reconfigure(themeExtension.value),
+  })
+})
+
+watch(() => props.readOnly, () => {
+  view?.dispatch({
+    effects: readOnlyCompartment.reconfigure(readOnlyExtension.value),
   })
 })
 

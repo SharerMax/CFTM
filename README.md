@@ -65,3 +65,34 @@ pnpm prisma:migrate      # create migration (interactive)
 ## Verification Order
 
 `lint → typecheck`
+
+## Recommended Skills
+
+This project is built using the following opencode skills. Install them for AI-assisted development that follows the same conventions:
+
+| Skill              | Use case in this project                          |
+| ------------------ | ------------------------------------------------- |
+| `antfu`            | Project scaffolding, monorepo, tooling conventions |
+| `antfu-design`     | UnoCSS-first design, theming, component styling   |
+| `git-commit`       | Conventional commit messages                      |
+| `naive-ui-skills`  | Naive UI component patterns and rules             |
+| `pinia`            | Vue state management (auth, tunnels, theme stores) |
+| `pnpm`             | Workspace management, catalogs                     |
+| `prisma-cli`       | Prisma CLI workflows (generate, migrate)          |
+| `prisma-client-api`| Prisma Client queries and DB operations            |
+| `unocss`           | Atomic CSS utilities and presets                  |
+| `vite`             | Build tool configuration                          |
+| `vue`              | Vue 3 Composition API, `<script setup>`           |
+| `vue-best-practices` | Vue 3 best practices and patterns               |
+| `vue-router-best-practices` | Vue Router guards and navigation         |
+| `vueuse-functions` | VueUse composables                                |
+| `vitest`           | Unit testing                                      |
+
+### MCP Servers
+
+| Server             | Purpose                                          |
+| ------------------ | ------------------------------------------------- |
+| `hono-docs`        | Query Hono framework documentation                |
+| `cloudflare-docs`  | Query Cloudflare Tunnel / API documentation       |
+
+Both are configured in `opencode.json` (project-level).

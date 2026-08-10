@@ -35,9 +35,12 @@ Uses `@antfu/eslint-config` (flat config, no Prettier). Root `eslint.config.ts` 
 
 ## Backend
 
+- **Router/Service separation**: `routes/` is the control layer (HTTP parsing, Zod validation, auth check, call service, return JSON — NO business logic, NO direct DB access). `services/` is the business layer (DB ops, CF API calls, process management)
 - Hono routes in `packages/server/src/routes/` (`auth`, `tunnels`, `zones` — DNS record CRUD, tunnel-linked records synced to DB)
+- `routes/tunnels.ts`: local CRUD (`GET/POST /`, `GET/PUT/DELETE /:id`, `/:id/config`, `/:id/start`, `/:id/stop`, `/:id/logs`) + remote (`GET /remote`, `GET/PUT /remote/config` — no DB storage, fetched/edited via CF API)
+- `services/tunnels.ts`: `TunnelService` holds all business logic. `listRemote(accountId)` fetches from CF and filters out DB tunnels; `getRemoteConfig`/`updateRemoteConfig` proxy to CF configurations API. Throws `TunnelError` with HTTP status for domain failures
 - Global `app.onError` in `index.ts`: Zod errors → 400, others → `{ error }` JSON 500
-- Cloudflare API client in `packages/server/src/services/cloudflare.ts`
+- Cloudflare API client in `packages/server/src/services/cloudflare.ts` — `listTunnels`, `createTunnel`, `getTunnelToken`, `getTunnelConfig`, `updateTunnelConfig` (configurations API for remote tunnels)
 - cloudflared process manager in `packages/server/src/services/tunnel.ts` — spawns `cloudflared tunnel run`, buffers logs (SSE), writes config.yml via `yaml` lib `stringify` (NOT hand-rolled YAML)
 - Token stored encrypted (AES-256-GCM) in SQLite `Setting` table
 - `getCfTokenAsync()` from `routes/auth.ts` used by all protected routes
@@ -48,11 +51,13 @@ Uses `@antfu/eslint-config` (flat config, no Prettier). Root `eslint.config.ts` 
 ## Frontend
 
 - State: Pinia stores in `client/src/stores/` (auth, tunnels, theme)
-- API client: `client/src/api/index.ts` — wrapper around fetch
+- API client: `client/src/api/index.ts` — wrapper around fetch, supports `{ params: {...} }` for query strings
 - Vite proxies `/api` to `http://localhost:3000`
 - Icons: unplugin-icons with `~icons/mdi/*` and `~icons/lucide/*` imports
 - **Layout**: `App.vue` = `NConfigProvider(:theme) > NGlobalStyle > NMessageProvider > NDialogProvider > NNotificationProvider > NLoadingBarProvider > AppLayout.vue` (sider/menu/theme toggle + RouterView). Theme driven by `stores/theme.ts` (`light` | `dark` | `system`, persisted in localStorage)
 - Router guard in `router/index.ts` redirects to `/settings` when token unconfigured (routes marked `meta.requiresAuth`)
+- `views/TunnelList.vue`: local/remote tabs. Local = DB tunnels (create/start/stop/delete/detail); Remote = live CF API tunnels (load by Account ID, view/edit config via API — not stored in DB)
+- `components/CodeEditor.vue`: CodeMirror editor with `language` (`yaml`|`json`), `dark`, and `readOnly` props (uses `EditorState.readOnly` compartment)
 
 ## Naive UI — Critical Rules
 
@@ -114,4 +119,5 @@ Prisma + SQLite (Prisma v7). Schema at `packages/server/prisma/schema.prisma`.
 - ✅ Phase 4: Config editor complete (JSON/YAML modes, linting, format, save via `yaml`/zod); create-tunnel modal wired; TunnelList NDataTable columns render via `h()` (VNode, not HTML strings)
 - ✅ Phase 5: DNS management complete (zone select, records CRUD via CF, tunnel-linked records persisted to DB)
 - ✅ Phase 6: Polish done — dark/light/system theme toggle (persisted, `stores/theme.ts`, `AppLayout.vue`), route guard redirects to Settings when token unconfigured, route loading bar, CodeEditor follows app theme, sider collapse-aware footer
+- ✅ Phase 7: Remote tunnel management — local/remote tabs; remote tunnels fetched/edited live via CF API (no DB storage); router/service separation (control layer vs business layer)
 

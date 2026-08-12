@@ -196,6 +196,15 @@ const remoteColumns: DataTableColumns<RemoteTunnel> = [
     width: 280,
   },
   {
+    title: '管理方式',
+    key: 'config_src',
+    width: 100,
+    render(row) {
+      const local = row.config_src === 'local'
+      return h(NTag, { type: local ? 'warning' : 'primary', size: 'small' }, { default: () => local ? '本地托管' : '远程托管' })
+    },
+  },
+  {
     title: 'Created',
     key: 'created_at',
     width: 180,
@@ -207,8 +216,17 @@ const remoteColumns: DataTableColumns<RemoteTunnel> = [
     title: 'Actions',
     key: 'actions',
     render(row) {
+      const local = row.config_src === 'local'
       return h('div', { style: 'display:flex;gap:8px' }, [
-        h(NButton, { size: 'small', text: true, type: 'primary', onClick: () => openConfig(row) }, { default: () => '查看/编辑' }),
+        h(NButton, {
+          size: 'small',
+          text: true,
+          type: 'primary',
+          disabled: local,
+          onClick: () => openConfig(row),
+        }, {
+          default: () => local ? '配置存储在源主机' : '查看/编辑',
+        }),
       ])
     },
   },

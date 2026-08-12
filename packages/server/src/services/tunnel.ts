@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { stringify } from 'yaml'
 
+export type TunnelRunMode = { type: 'token', token: string } | { type: 'config', name: string, config: Record<string, unknown> }
+
 interface TunnelProcess {
   process: ChildProcess
   tunnelId: string
@@ -21,27 +23,41 @@ const MAX_LOG_LINES = 1000
 class TunnelManager extends EventEmitter {
   private processes = new Map<string, TunnelProcess>()
 
-  async start(tunnelId: string, config: object, token: string): Promise<void> {
+  async start(tunnelId: string, mode: TunnelRunMode): Promise<void> {
     if (this.processes.has(tunnelId)) {
       throw new Error('Tunnel is already running')
     }
 
-    const configDir = join(tmpdir(), 'cftm', tunnelId)
-    if (!existsSync(configDir)) {
-      await mkdir(configDir, { recursive: true })
+    let args: string[]
+
+    if (mode.type === 'token') {
+      args = [
+        'tunnel',
+        'run',
+        '--token',
+        mode.token,
+      ]
+    }
+    else {
+      const configDir = join(tmpdir(), 'cftm', tunnelId)
+      if (!existsSync(configDir)) {
+        await mkdir(configDir, { recursive: true })
+      }
+
+      const configPath = join(configDir, 'config.yml')
+      await writeFile(configPath, stringify(mode.config))
+
+      args = [
+        'tunnel',
+        'run',
+        '--config',
+        configPath,
+        mode.name,
+      ]
     }
 
-    const configPath = join(configDir, 'config.yml')
-    await writeFile(configPath, stringify(config))
-
     const logBuffer: string[] = []
-    const proc = spawn('cloudflared', [
-      'tunnel',
-      'run',
-      '--config',
-      configPath,
-      token,
-    ], { stdio: ['ignore', 'pipe', 'pipe'] })
+    const proc = spawn('cloudflared', args, { stdio: ['ignore', 'pipe', 'pipe'] })
 
     const tunnelProc: TunnelProcess = {
       process: proc,

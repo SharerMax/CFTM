@@ -73,10 +73,14 @@ export class CloudflareApi {
     return this.request<CfTunnel[]>(`/accounts/${accountId}/cfd_tunnel`)
   }
 
+  async getTunnel(accountId: string, tunnelId: string): Promise<CfTunnel> {
+    return this.request<CfTunnel>(`/accounts/${accountId}/cfd_tunnel/${tunnelId}`)
+  }
+
   async createTunnel(accountId: string, name: string): Promise<CfTunnel> {
     return this.request<CfTunnel>(`/accounts/${accountId}/cfd_tunnel`, {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, config_src: 'cloudflare' }),
     })
   }
 

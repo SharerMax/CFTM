@@ -87,10 +87,16 @@ export class TunnelService {
   }
 
   async getRemoteConfig(accountId: string, tunnelId: string): Promise<CfTunnelConfig> {
+    const tunnel = await this.cf.getTunnel(accountId, tunnelId)
+    if (tunnel.config_src === 'local')
+      throw new TunnelError('locally_managed_config', 409)
     return this.cf.getTunnelConfig(accountId, tunnelId)
   }
 
   async updateRemoteConfig(accountId: string, tunnelId: string, config: CfTunnelConfig): Promise<CfTunnelConfig> {
+    const tunnel = await this.cf.getTunnel(accountId, tunnelId)
+    if (tunnel.config_src === 'local')
+      throw new TunnelError('locally_managed_config', 409)
     return this.cf.updateTunnelConfig(accountId, tunnelId, config)
   }
 
@@ -133,6 +139,14 @@ export class TunnelService {
     if (!tunnel)
       throw new TunnelError('not_found', 404)
 
+    if (tunnel.cloudflareTunnelId) {
+      const cfConfig: CfTunnelConfig = {
+        ingress: config.ingress,
+        ...(config.originRequest ? { originRequest: config.originRequest } : {}),
+      }
+      await this.cf.updateTunnelConfig(tunnel.accountId, tunnel.cloudflareTunnelId, cfConfig)
+    }
+
     await prisma.tunnel.update({
       where: { id },
       data: { config: JSON.stringify(config) },
@@ -147,9 +161,8 @@ export class TunnelService {
       throw new TunnelError('already_running', 400)
 
     try {
-      const config = JSON.parse(tunnel.config)
       const tunnelToken = decrypt(tunnel.encryptedToken!)
-      await tunnelManager.start(id, config, tunnelToken)
+      await tunnelManager.start(id, { type: 'token', token: tunnelToken })
       await prisma.tunnel.update({ where: { id }, data: { status: 'running' } })
     }
     catch (e) {

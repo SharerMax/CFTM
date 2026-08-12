@@ -38,10 +38,10 @@ Uses `@antfu/eslint-config` (flat config, no Prettier). Root `eslint.config.ts` 
 - **Router/Service separation**: `routes/` is the control layer (HTTP parsing, Zod validation, auth check, call service, return JSON — NO business logic, NO direct DB access). `services/` is the business layer (DB ops, CF API calls, process management)
 - Hono routes in `packages/server/src/routes/` (`auth`, `tunnels`, `zones` — DNS record CRUD, tunnel-linked records synced to DB)
 - `routes/tunnels.ts`: local CRUD (`GET/POST /`, `GET/PUT/DELETE /:id`, `/:id/config`, `/:id/start`, `/:id/stop`, `/:id/logs`) + remote (`GET /remote`, `GET/PUT /remote/config` — no DB storage, fetched/edited via CF API)
-- `services/tunnels.ts`: `TunnelService` holds all business logic. `listRemote(accountId)` fetches from CF and filters out DB tunnels; `getRemoteConfig`/`updateRemoteConfig` proxy to CF configurations API. Throws `TunnelError` with HTTP status for domain failures
+- `services/tunnels.ts`: `TunnelService` holds all business logic. `listRemote(accountId)` fetches from CF and filters out DB tunnels; `getRemoteConfig`/`updateRemoteConfig` proxy to CF configurations API — **but reject `config_src: 'local'` tunnels with 409** (their config lives on the origin host, configurations API is invalid). `updateConfig` for managed tunnels syncs ingress/originRequest to the configurations API before saving to DB. Throws `TunnelError` with HTTP status for domain failures
 - Global `app.onError` in `index.ts`: Zod errors → 400, others → `{ error }` JSON 500
-- Cloudflare API client in `packages/server/src/services/cloudflare.ts` — `listTunnels`, `createTunnel`, `getTunnelToken`, `getTunnelConfig`, `updateTunnelConfig` (configurations API for remote tunnels)
-- cloudflared process manager in `packages/server/src/services/tunnel.ts` — spawns `cloudflared tunnel run`, buffers logs (SSE), writes config.yml via `yaml` lib `stringify` (NOT hand-rolled YAML)
+- Cloudflare API client in `packages/server/src/services/cloudflare.ts` — `listTunnels`, `getTunnel`, `createTunnel` (explicitly `config_src: 'cloudflare'`), `getTunnelToken`, `getTunnelConfig`, `updateTunnelConfig` (configurations API for remotely-managed tunnels)
+- cloudflared process manager in `packages/server/src/services/tunnel.ts` — spawns `cloudflared tunnel run`; **two run modes via `TunnelRunMode`**: `{ type: 'token' }` runs `--token <TOKEN>` for remotely-managed tunnels (no config file), `{ type: 'config' }` writes config.yml via `yaml` lib `stringify` (NOT hand-rolled YAML) and runs `--config <path> <name>` for locally-managed tunnels; buffers logs (SSE)
 - Token stored encrypted (AES-256-GCM) in SQLite `Setting` table
 - `getCfTokenAsync()` from `routes/auth.ts` used by all protected routes
 - Prisma singleton in `packages/server/src/prisma.ts` — uses v7 driver adapter (`PrismaBetterSqlite3`), import from `../generated/prisma/client`
@@ -56,7 +56,7 @@ Uses `@antfu/eslint-config` (flat config, no Prettier). Root `eslint.config.ts` 
 - Icons: unplugin-icons with `~icons/mdi/*` and `~icons/lucide/*` imports
 - **Layout**: `App.vue` = `NConfigProvider(:theme) > NGlobalStyle > NMessageProvider > NDialogProvider > NNotificationProvider > NLoadingBarProvider > AppLayout.vue` (sider/menu/theme toggle + RouterView). Theme driven by `stores/theme.ts` (`light` | `dark` | `system`, persisted in localStorage)
 - Router guard in `router/index.ts` redirects to `/settings` when token unconfigured (routes marked `meta.requiresAuth`)
-- `views/TunnelList.vue`: local/remote tabs. Local = DB tunnels (create/start/stop/delete/detail); Remote = live CF API tunnels (load by Account ID, view/edit config via API — not stored in DB)
+- `views/TunnelList.vue`: local/remote tabs. Local = DB tunnels (create/start/stop/delete/detail); Remote = live CF API tunnels (load by Account ID, view/edit config via API — not stored in DB); remote rows show management type (remotely/locally managed), locally-managed config edits disabled
 - `components/CodeEditor.vue`: CodeMirror editor with `language` (`yaml`|`json`), `dark`, and `readOnly` props (uses `EditorState.readOnly` compartment)
 
 ## Naive UI — Critical Rules
@@ -120,4 +120,5 @@ Prisma + SQLite (Prisma v7). Schema at `packages/server/prisma/schema.prisma`.
 - ✅ Phase 5: DNS management complete (zone select, records CRUD via CF, tunnel-linked records persisted to DB)
 - ✅ Phase 6: Polish done — dark/light/system theme toggle (persisted, `stores/theme.ts`, `AppLayout.vue`), route guard redirects to Settings when token unconfigured, route loading bar, CodeEditor follows app theme, sider collapse-aware footer
 - ✅ Phase 7: Remote tunnel management — local/remote tabs; remote tunnels fetched/edited live via CF API (no DB storage); router/service separation (control layer vs business layer)
+- ✅ Phase 8: Remote/locally-managed tunnel split — run remotely-managed tunnels via `--token` (no config.yml); reject `config_src: 'local'` tunnels from configurations API with 409; `updateConfig` syncs to configurations API; remote list shows management type, locally-managed config edits disabled
 

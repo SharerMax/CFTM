@@ -32,11 +32,11 @@ export const useTunnelStore = defineStore('tunnels', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchTunnels() {
+  async function fetchTunnels(accountId?: string) {
     loading.value = true
     error.value = null
     try {
-      tunnels.value = await api.get<Tunnel[]>('/tunnels')
+      tunnels.value = await api.get<Tunnel[]>('/tunnels', accountId ? { params: { accountId } } : undefined)
     }
     catch (e) {
       error.value = (e as Error).message

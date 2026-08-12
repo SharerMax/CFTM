@@ -1,27 +1,29 @@
 <script setup lang="ts">
-import type { MenuOption } from 'naive-ui'
+import type { MenuOption, SelectOption } from 'naive-ui'
 import {
   NBadge,
   NButton,
   NIcon,
   NLayout,
   NLayoutContent,
+  NLayoutHeader,
   NLayoutSider,
   NMenu,
+  NSelect,
   useLoadingBar,
 } from 'naive-ui'
-import { h, onUnmounted, ref } from 'vue'
+import { computed, h, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
-import IconMdiCog from '~icons/mdi/cog'
+import IconMdiAccountGroup from '~icons/mdi/account-group'
 import IconMdiDns from '~icons/mdi/dns'
 import IconMdiThemeLightDark from '~icons/mdi/theme-light-dark'
 import IconMdiTunnel from '~icons/mdi/tunnel'
 import IconMdiWeatherNight from '~icons/mdi/weather-night'
 import IconMdiWhiteBalanceSunny from '~icons/mdi/white-balance-sunny'
-import { useAuthStore } from './stores/auth'
+import { useAccountStore } from './stores/accounts'
 import { useThemeStore } from './stores/theme'
 
-const authStore = useAuthStore()
+const accountStore = useAccountStore()
 const themeStore = useThemeStore()
 const router = useRouter()
 const loadingBar = useLoadingBar()
@@ -40,14 +42,26 @@ const menuOptions: MenuOption[] = [
     icon: () => h(NIcon, null, { default: () => h(IconMdiDns) }),
   },
   {
-    label: () => h(RouterLink, { to: '/settings' }, { default: () => 'Settings' }),
-    key: '/settings',
-    icon: () => h(NIcon, null, { default: () => h(IconMdiCog) }),
+    label: () => h(RouterLink, { to: '/accounts' }, { default: () => 'Accounts' }),
+    key: '/accounts',
+    icon: () => h(NIcon, null, { default: () => h(IconMdiAccountGroup) }),
   },
 ]
 
+const accountOptions = computed<SelectOption[]>(() => [
+  { label: 'All accounts', value: 'all' },
+  ...accountStore.accounts.map(a => ({
+    label: a.name,
+    value: a.id,
+  })),
+])
+
 function handleMenuUpdate(key: string) {
   router.push(key)
+}
+
+function handleAccountUpdate(value: string) {
+  accountStore.setSelected(value)
 }
 
 const removeBeforeEach = router.beforeEach(() => {
@@ -55,6 +69,10 @@ const removeBeforeEach = router.beforeEach(() => {
 })
 const removeAfterEach = router.afterEach(() => {
   loadingBar.finish()
+})
+
+onMounted(() => {
+  accountStore.loadAccounts()
 })
 
 onUnmounted(() => {
@@ -76,7 +94,11 @@ onUnmounted(() => {
     >
       <div class="mb-6 flex items-center gap-2 px-2">
         <span class="text-primary text-lg font-bold">CFTM</span>
-        <NBadge :type="authStore.configured ? 'success' : 'warning'" dot />
+        <NBadge
+          :type="accountStore.accounts.length > 0 ? 'success' : 'warning'"
+          :value="accountStore.accounts.length"
+          :max="99"
+        />
       </div>
       <NMenu
         :options="menuOptions"
@@ -120,12 +142,25 @@ onUnmounted(() => {
           </NButton>
         </div>
         <div>
-          {{ authStore.configured ? 'Token 已配置' : 'Token 未配置' }}
+          {{ accountStore.accounts.length > 0 ? `${accountStore.accounts.length} 个账户` : '未配置账户' }}
         </div>
       </div>
     </NLayoutSider>
-    <NLayoutContent content-style="padding: 24px;">
-      <RouterView />
-    </NLayoutContent>
+    <NLayout>
+      <NLayoutHeader bordered content-style="padding: 8px 24px;">
+        <div class="flex items-center justify-end">
+          <NSelect
+            :value="accountStore.selectedAccountId"
+            :options="accountOptions"
+            placeholder="选择账户"
+            style="width: 220px;"
+            @update:value="handleAccountUpdate"
+          />
+        </div>
+      </NLayoutHeader>
+      <NLayoutContent content-style="padding: 24px;">
+        <RouterView />
+      </NLayoutContent>
+    </NLayout>
   </NLayout>
 </template>

@@ -20,15 +20,17 @@ import {
   useMessage,
 } from 'naive-ui'
 import { computed, h, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import IconMdiDelete from '~icons/mdi/delete'
 import IconMdiPlus from '~icons/mdi/plus'
 import IconMdiRefresh from '~icons/mdi/refresh'
 import { api } from '../api'
-import { useAuthStore } from '../stores/auth'
+import { useAccountStore } from '../stores/accounts'
 import { useTunnelStore } from '../stores/tunnels'
 
-const authStore = useAuthStore()
+const accountStore = useAccountStore()
 const tunnelStore = useTunnelStore()
+const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
 
@@ -48,6 +50,11 @@ const form = ref({
   tunnelId: null as string | null,
 })
 
+const activeAccountId = computed(() => accountStore.selectedCloudflareAccountId)
+
+const hasAccount = computed(() => accountStore.accounts.length > 0)
+const hasSelection = computed(() => !!(activeAccountId.value))
+
 const zoneOptions = computed(() =>
   zones.value.map(z => ({ label: z.name, value: z.id })))
 
@@ -61,9 +68,11 @@ const typeOptions: SelectOption[] = [
 ]
 
 async function loadZones() {
+  if (!activeAccountId.value)
+    return
   loadingZones.value = true
   try {
-    zones.value = await api.get<ZoneDTO[]>('/zones')
+    zones.value = await api.get<ZoneDTO[]>('/zones', { params: { accountId: activeAccountId.value } })
     if (zoneId.value) {
       await loadRecords()
     }
@@ -80,11 +89,11 @@ async function loadZones() {
 }
 
 async function loadRecords() {
-  if (!zoneId.value)
+  if (!zoneId.value || !activeAccountId.value)
     return
   loadingRecords.value = true
   try {
-    records.value = await api.get<DnsRecordView[]>(`/zones/${zoneId.value}/records`)
+    records.value = await api.get<DnsRecordView[]>(`/zones/${zoneId.value}/records`, { params: { accountId: activeAccountId.value } })
   }
   catch (e) {
     message.error(`加载 DNS 记录失败: ${(e as Error).message}`)
@@ -96,6 +105,15 @@ async function loadRecords() {
 
 watch(zoneId, () => {
   loadRecords()
+})
+
+watch(() => accountStore.selectedAccountId, () => {
+  zones.value = []
+  zoneId.value = null
+  records.value = []
+  if (activeAccountId.value) {
+    loadZones()
+  }
 })
 
 function openCreate() {
@@ -131,7 +149,7 @@ async function handleCreate() {
 
   creating.value = true
   try {
-    await api.post<DnsRecordView>(`/zones/${zoneId.value}/records`, input.data)
+    await api.post<DnsRecordView>(`/zones/${zoneId.value}/records`, input.data, { params: { accountId: activeAccountId.value! } })
     message.success('DNS 记录已创建')
     showCreate.value = false
     await loadRecords()
@@ -152,7 +170,7 @@ function handleDelete(record: DnsRecordView) {
     negativeText: '取消',
     onPositiveClick: async () => {
       try {
-        await api.delete(`/zones/${zoneId.value}/records/${record.id}`)
+        await api.delete(`/zones/${zoneId.value}/records/${record.id}`, { params: { accountId: activeAccountId.value! } })
         message.success('DNS 记录已删除')
         await loadRecords()
       }
@@ -195,9 +213,9 @@ const columns: DataTableColumns<DnsRecordView> = [
 ]
 
 onMounted(async () => {
-  await authStore.checkStatus()
-  if (authStore.configured) {
-    await Promise.all([loadZones(), tunnelStore.fetchTunnels()])
+  tunnelStore.fetchTunnels()
+  if (activeAccountId.value) {
+    await loadZones()
   }
 })
 </script>
@@ -208,7 +226,7 @@ onMounted(async () => {
       <h2 class="text-xl font-semibold">
         DNS 管理
       </h2>
-      <NSpace>
+      <NSpace v-if="hasSelection">
         <NSelect
           v-model:value="zoneId"
           :options="zoneOptions"
@@ -232,7 +250,21 @@ onMounted(async () => {
     </div>
 
     <NCard>
-      <NSpin :show="loadingZones || loadingRecords">
+      <NEmpty
+        v-if="!hasAccount"
+        description="暂无账户，请先配置账户"
+      >
+        <template #extra>
+          <NButton type="primary" @click="router.push('/accounts')">
+            前往 Accounts
+          </NButton>
+        </template>
+      </NEmpty>
+      <NEmpty
+        v-else-if="!hasSelection"
+        description="请先在顶部选择具体账户以加载 Zone"
+      />
+      <NSpin v-else :show="loadingZones || loadingRecords">
         <NEmpty v-if="!zoneId" description="请选择 Zone" />
         <NEmpty v-else-if="records.length === 0 && !loadingRecords" description="暂无 DNS 记录" />
         <NDataTable v-else :columns="columns" :data="records" :bordered="false" />

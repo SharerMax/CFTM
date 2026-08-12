@@ -9,8 +9,8 @@ import {
   NEmpty,
   NForm,
   NFormItem,
-  NInput,
   NModal,
+  NSelect,
   NSpin,
   NTabPane,
   NTabs,
@@ -18,17 +18,17 @@ import {
   useDialog,
   useMessage,
 } from 'naive-ui'
-import { h, onMounted, ref } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import IconMdiCog from '~icons/mdi/cog'
 import IconMdiPlus from '~icons/mdi/plus'
 import CodeEditor from '../components/CodeEditor.vue'
-import { useAuthStore } from '../stores/auth'
+import { useAccountStore } from '../stores/accounts'
 import { useThemeStore } from '../stores/theme'
 import { useTunnelStore } from '../stores/tunnels'
 
 const tunnelStore = useTunnelStore()
-const authStore = useAuthStore()
+const accountStore = useAccountStore()
 const themeStore = useThemeStore()
 const message = useMessage()
 const dialog = useDialog()
@@ -37,12 +37,11 @@ const router = useRouter()
 const showCreate = ref(false)
 const creating = ref(false)
 const name = ref('')
-const accountId = ref('')
+const createAccountId = ref<string | null>(null)
 
 const activeTab = ref('local')
 const remoteLoading = ref(false)
 const remoteTunnels = ref<RemoteTunnel[]>([])
-const remoteAccountId = ref('')
 
 const showConfig = ref(false)
 const configLoading = ref(false)
@@ -50,14 +49,38 @@ const configSaving = ref(false)
 const editingTunnel = ref<RemoteTunnel | null>(null)
 const configText = ref('')
 
+const accountOptions = computed(() =>
+  accountStore.accounts.map(a => ({ label: a.name, value: a.id })))
+
+const localTunnels = computed(() => {
+  if (accountStore.selectedAccountId === 'all')
+    return tunnelStore.tunnels
+  const acc = accountStore.selectedAccount
+  if (!acc)
+    return tunnelStore.tunnels
+  return tunnelStore.tunnels.filter(t => t.accountId === acc.cloudflareAccountId)
+})
+
+const remoteAccountId = computed(() =>
+  accountStore.selectedCloudflareAccountId ?? '')
+
+const isRemoteSupported = computed(() =>
+  accountStore.selectedAccountId !== 'all' && !!remoteAccountId.value)
+
 async function handleCreate() {
+  const selected = accountStore.accounts.find(a => a.id === createAccountId.value)
+  if (!selected) {
+    message.warning('请选择账户')
+    return
+  }
+
   const input = createTunnelSchema.safeParse({
     name: name.value.trim(),
-    accountId: accountId.value.trim(),
+    accountId: selected.cloudflareAccountId,
   })
 
   if (!input.success) {
-    message.warning('请填写有效的名称 (1-64 字符) 和 Account ID')
+    message.warning('请填写有效的名称 (1-64 字符)')
     return
   }
 
@@ -67,7 +90,7 @@ async function handleCreate() {
     message.success('隧道创建成功')
     showCreate.value = false
     name.value = ''
-    accountId.value = ''
+    createAccountId.value = null
   }
   catch (e) {
     message.error(`创建失败: ${(e as Error).message}`)
@@ -78,14 +101,14 @@ async function handleCreate() {
 }
 
 async function loadRemote() {
-  if (!remoteAccountId.value.trim()) {
-    message.warning('请输入 Account ID')
+  if (!isRemoteSupported.value) {
+    message.warning('请先在顶部选择具体账户')
     return
   }
 
   remoteLoading.value = true
   try {
-    remoteTunnels.value = await tunnelStore.listRemote(remoteAccountId.value.trim())
+    remoteTunnels.value = await tunnelStore.listRemote(remoteAccountId.value)
   }
   catch (e) {
     message.error(`加载失败: ${(e as Error).message}`)
@@ -100,7 +123,7 @@ async function openConfig(tunnel: RemoteTunnel) {
   configLoading.value = true
   showConfig.value = true
   try {
-    const config = await tunnelStore.getRemoteConfig(remoteAccountId.value.trim(), tunnel.id)
+    const config = await tunnelStore.getRemoteConfig(remoteAccountId.value, tunnel.id)
     configText.value = JSON.stringify(config, null, 2)
   }
   catch (e) {
@@ -127,7 +150,7 @@ async function saveConfig() {
 
   configSaving.value = true
   try {
-    await tunnelStore.updateRemoteConfig(remoteAccountId.value.trim(), editingTunnel.value.id, config)
+    await tunnelStore.updateRemoteConfig(remoteAccountId.value, editingTunnel.value.id, config)
     message.success('配置已保存')
     showConfig.value = false
   }
@@ -138,6 +161,11 @@ async function saveConfig() {
     configSaving.value = false
   }
 }
+
+watch(() => accountStore.selectedAccountId, () => {
+  if (activeTab.value === 'remote' && isRemoteSupported.value)
+    loadRemote()
+})
 
 const localColumns: DataTableColumns<Tunnel> = [
   {
@@ -251,9 +279,7 @@ function handleDelete(tunnel: Tunnel) {
 }
 
 onMounted(() => {
-  if (authStore.configured) {
-    tunnelStore.fetchTunnels()
-  }
+  tunnelStore.fetchTunnels()
 })
 </script>
 
@@ -263,24 +289,73 @@ onMounted(() => {
       <h2 class="text-xl font-semibold">
         Tunnels
       </h2>
-      <NButton v-if="!authStore.configured" type="primary" @click="router.push('/settings')">
-        配置 Token
-      </NButton>
-      <NButton v-else type="primary" @click="showCreate = true">
-        <template #icon>
-          <IconMdiPlus />
-        </template>
-        新建隧道
-      </NButton>
+      <div class="flex items-center gap-2">
+        <NButton v-if="accountStore.accounts.length === 0" type="primary" @click="router.push('/accounts')">
+          配置账户
+        </NButton>
+        <NButton v-else type="primary" @click="showCreate = true">
+          <template #icon>
+            <IconMdiPlus />
+          </template>
+          新建隧道
+        </NButton>
+      </div>
     </div>
+
+    <NTabs v-if="accountStore.accounts.length > 0" v-model:value="activeTab" type="line">
+      <NTabPane name="local" tab="本地管理">
+        <NCard>
+          <NSpin v-if="tunnelStore.loading" />
+          <NEmpty v-else-if="localTunnels.length === 0" description="暂无本地隧道，点击上方按钮创建" />
+          <NDataTable v-else :columns="localColumns" :data="localTunnels" :bordered="false" />
+        </NCard>
+      </NTabPane>
+
+      <NTabPane name="remote" tab="远程管理">
+        <NCard>
+          <div class="mb-4 flex items-center gap-2">
+            <span class="text-sm text-gray-500">
+              当前账户: {{ accountStore.selectedAccountId === 'all' ? 'All accounts (请选择具体账户)' : (accountStore.selectedAccount?.name || '-') }}
+            </span>
+            <NButton :loading="remoteLoading" :disabled="!isRemoteSupported" @click="loadRemote">
+              <template #icon>
+                <IconMdiCog />
+              </template>
+              加载远程隧道
+            </NButton>
+          </div>
+          <NEmpty
+            v-if="!isRemoteSupported"
+            description="远程管理需要选择具体账户，请在顶部选择账户"
+          />
+          <template v-else>
+            <NSpin v-if="remoteLoading" />
+            <NEmpty v-else-if="remoteTunnels.length === 0" :description="`账户 ${accountStore.selectedAccount?.name || ''} 暂无远程隧道`" />
+            <NDataTable v-else :columns="remoteColumns" :data="remoteTunnels" :bordered="false" />
+          </template>
+        </NCard>
+      </NTabPane>
+    </NTabs>
+    <NEmpty v-else description="暂无账户，请先配置账户" class="mt-12">
+      <template #extra>
+        <NButton type="primary" @click="router.push('/accounts')">
+          前往 Accounts
+        </NButton>
+      </template>
+    </NEmpty>
 
     <NModal v-model:show="showCreate" preset="dialog" title="新建隧道">
       <NForm label-placement="top">
         <NFormItem label="名称">
           <NInput v-model:value="name" placeholder="隧道名称 (1-64 字符)" clearable />
         </NFormItem>
-        <NFormItem label="Account ID">
-          <NInput v-model:value="accountId" placeholder="Cloudflare Account ID" clearable />
+        <NFormItem label="账户">
+          <NSelect
+            v-model:value="createAccountId"
+            :options="accountOptions"
+            placeholder="选择账户"
+            clearable
+          />
         </NFormItem>
       </NForm>
       <template #action>
@@ -312,38 +387,5 @@ onMounted(() => {
         </NButton>
       </template>
     </NModal>
-
-    <NTabs v-model:value="activeTab" type="line">
-      <NTabPane name="local" tab="本地管理">
-        <NCard>
-          <NSpin v-if="tunnelStore.loading" />
-          <NEmpty v-else-if="tunnelStore.tunnels.length === 0" description="暂无本地隧道，点击上方按钮创建" />
-          <NDataTable v-else :columns="localColumns" :data="tunnelStore.tunnels" :bordered="false" />
-        </NCard>
-      </NTabPane>
-
-      <NTabPane name="remote" tab="远程管理">
-        <NCard>
-          <div class="mb-4 flex items-center gap-2">
-            <NInput
-              v-model:value="remoteAccountId"
-              placeholder="Cloudflare Account ID"
-              style="width: 320px;"
-              clearable
-              @keyup.enter="loadRemote"
-            />
-            <NButton :loading="remoteLoading" @click="loadRemote">
-              <template #icon>
-                <IconMdiCog />
-              </template>
-              加载远程隧道
-            </NButton>
-          </div>
-          <NSpin v-if="remoteLoading" />
-          <NEmpty v-else-if="remoteTunnels.length === 0" description="输入 Account ID 后加载远程隧道" />
-          <NDataTable v-else :columns="remoteColumns" :data="remoteTunnels" :bordered="false" />
-        </NCard>
-      </NTabPane>
-    </NTabs>
   </div>
 </template>

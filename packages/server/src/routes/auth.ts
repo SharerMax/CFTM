@@ -14,8 +14,13 @@ authRoutes.post('/verify', async (c) => {
   const body = await c.req.json()
   const { token } = verifySchema.parse(body)
 
-  const cf = new CloudflareApi(token)
-  const result = await cf.verifyToken()
+  let result: { id: string, status: string }
+  try {
+    result = await new CloudflareApi(token).verifyToken()
+  }
+  catch (e) {
+    return c.json({ error: 'invalid_token', message: (e as Error).message || 'Token 验证失败' }, 401)
+  }
 
   const encrypted = encrypt(token)
   await prisma.setting.upsert({

@@ -38,3 +38,13 @@ model Setting {
   value     String
   updatedAt DateTime @updatedAt
 }
+
+model Account {
+  id                  String   @id @default(cuid())
+  name                String
+  cloudflareAccountId String   @unique
+  encryptedToken      String
+  cloudflareTokenId   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}

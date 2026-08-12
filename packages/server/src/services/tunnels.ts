@@ -2,6 +2,7 @@ import type { CreateTunnelInput, UpdateConfigInput } from '@cftm/shared/schemas'
 import type { CfTunnel, CfTunnelConfig } from './cloudflare'
 import { decrypt, encrypt } from '@cftm/shared/crypto'
 import { prisma } from '../prisma'
+import { AccountService } from './accounts'
 import { CloudflareApi } from './cloudflare'
 import { tunnelManager } from './tunnel'
 
@@ -35,6 +36,15 @@ export interface TunnelDTO {
   runtimeStatus?: string
 }
 
+const accountService = new AccountService()
+
+async function cfForAccountId(accountId: string): Promise<CloudflareApi> {
+  const token = await accountService.getTokenByAccountId(accountId)
+  if (!token)
+    throw new TunnelError('account_not_found', 404)
+  return new CloudflareApi(token)
+}
+
 function toDTO(tunnel: {
   id: string
   name: string
@@ -59,12 +69,6 @@ function toDTO(tunnel: {
 }
 
 export class TunnelService {
-  private cf: CloudflareApi
-
-  constructor(token: string) {
-    this.cf = new CloudflareApi(token)
-  }
-
   async list(): Promise<TunnelDTO[]> {
     const tunnels = await prisma.tunnel.findMany({
       orderBy: { createdAt: 'desc' },
@@ -73,7 +77,8 @@ export class TunnelService {
   }
 
   async listRemote(accountId: string): Promise<CfTunnel[]> {
-    const cfTunnels = await this.cf.listTunnels(accountId)
+    const cf = await cfForAccountId(accountId)
+    const cfTunnels = await cf.listTunnels(accountId)
 
     const existing = await prisma.tunnel.findMany({
       where: { accountId },
@@ -87,17 +92,19 @@ export class TunnelService {
   }
 
   async getRemoteConfig(accountId: string, tunnelId: string): Promise<CfTunnelConfig> {
-    const tunnel = await this.cf.getTunnel(accountId, tunnelId)
+    const cf = await cfForAccountId(accountId)
+    const tunnel = await cf.getTunnel(accountId, tunnelId)
     if (tunnel.config_src === 'local')
       throw new TunnelError('locally_managed_config', 409)
-    return this.cf.getTunnelConfig(accountId, tunnelId)
+    return cf.getTunnelConfig(accountId, tunnelId)
   }
 
   async updateRemoteConfig(accountId: string, tunnelId: string, config: CfTunnelConfig): Promise<CfTunnelConfig> {
-    const tunnel = await this.cf.getTunnel(accountId, tunnelId)
+    const cf = await cfForAccountId(accountId)
+    const tunnel = await cf.getTunnel(accountId, tunnelId)
     if (tunnel.config_src === 'local')
       throw new TunnelError('locally_managed_config', 409)
-    return this.cf.updateTunnelConfig(accountId, tunnelId, config)
+    return cf.updateTunnelConfig(accountId, tunnelId, config)
   }
 
   async get(id: string): Promise<TunnelDTO> {
@@ -113,8 +120,9 @@ export class TunnelService {
   }
 
   async create(input: CreateTunnelInput): Promise<TunnelDTO> {
-    const cfTunnel = await this.cf.createTunnel(input.accountId, input.name)
-    const tunnelToken = await this.cf.getTunnelToken(input.accountId, cfTunnel.id)
+    const cf = await cfForAccountId(input.accountId)
+    const cfTunnel = await cf.createTunnel(input.accountId, input.name)
+    const tunnelToken = await cf.getTunnelToken(input.accountId, cfTunnel.id)
 
     const tunnel = await prisma.tunnel.create({
       data: {
@@ -140,11 +148,12 @@ export class TunnelService {
       throw new TunnelError('not_found', 404)
 
     if (tunnel.cloudflareTunnelId) {
+      const cf = await cfForAccountId(tunnel.accountId)
       const cfConfig: CfTunnelConfig = {
         ingress: config.ingress,
         ...(config.originRequest ? { originRequest: config.originRequest } : {}),
       }
-      await this.cf.updateTunnelConfig(tunnel.accountId, tunnel.cloudflareTunnelId, cfConfig)
+      await cf.updateTunnelConfig(tunnel.accountId, tunnel.cloudflareTunnelId, cfConfig)
     }
 
     await prisma.tunnel.update({
@@ -187,8 +196,10 @@ export class TunnelService {
     if (tunnelManager.isRunning(id))
       tunnelManager.stop(id)
 
-    if (tunnel.cloudflareTunnelId)
-      await this.cf.deleteTunnel(tunnel.accountId, tunnel.cloudflareTunnelId)
+    if (tunnel.cloudflareTunnelId) {
+      const cf = await cfForAccountId(tunnel.accountId)
+      await cf.deleteTunnel(tunnel.accountId, tunnel.cloudflareTunnelId)
+    }
 
     await prisma.tunnel.delete({ where: { id } })
   }

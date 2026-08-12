@@ -36,27 +36,32 @@ Uses `@antfu/eslint-config` (flat config, no Prettier). Root `eslint.config.ts` 
 ## Backend
 
 - **Router/Service separation**: `routes/` is the control layer (HTTP parsing, Zod validation, auth check, call service, return JSON — NO business logic, NO direct DB access). `services/` is the business layer (DB ops, CF API calls, process management)
-- Hono routes in `packages/server/src/routes/` (`auth`, `tunnels`, `zones` — DNS record CRUD, tunnel-linked records synced to DB)
-- `routes/tunnels.ts`: local CRUD (`GET/POST /`, `GET/PUT/DELETE /:id`, `/:id/config`, `/:id/start`, `/:id/stop`, `/:id/logs`) + remote (`GET /remote`, `GET/PUT /remote/config` — no DB storage, fetched/edited via CF API)
-- `services/tunnels.ts`: `TunnelService` holds all business logic. `listRemote(accountId)` fetches from CF and filters out DB tunnels; `getRemoteConfig`/`updateRemoteConfig` proxy to CF configurations API — **but reject `config_src: 'local'` tunnels with 409** (their config lives on the origin host, configurations API is invalid). `updateConfig` for managed tunnels syncs ingress/originRequest to the configurations API before saving to DB. Throws `TunnelError` with HTTP status for domain failures
+- Hono routes in `packages/server/src/routes/` (`accounts`, `tunnels`, `zones` — DNS record CRUD, tunnel-linked records synced to DB)
+- `routes/accounts.ts`: per-account management — `GET/POST /`, `PUT/DELETE /:id`. `POST`/`PUT` verify the token via CF before storing; `DELETE` is blocked with 409 (`account_in_use`) while any local `Tunnel.accountId` references the account's `cloudflareAccountId`
+- `routes/tunnels.ts`: local CRUD (`GET/POST /`, `GET/PUT/DELETE /:id`, `/:id/config`, `/:id/start`, `/:id/stop`, `/:id/logs`) + remote (`GET /remote`, `GET/PUT /remote/config` — no DB storage, fetched/edited via CF API, requires `?accountId=`)
+- `routes/zones.ts`: DNS CRUD requires `?accountId=`, resolved to that account's token
+- `services/accounts.ts`: `AccountService` — CRUD, token verify on create/update, delete-block check, and `getTokenByAccountId`/`getTokenById` helpers used to resolve per-account tokens
+- `services/migration.ts`: `migrateLegacyToken()` runs once at server startup — decrypts the old `cf_token` Setting, verifies it, creates a default `Account` (empty `cloudflareAccountId` when the legacy token had none), then removes the Setting row
+- `services/tunnels.ts`: `TunnelService` (no injected token) resolves each account's token on demand. `listRemote(accountId)` fetches from CF and filters out DB tunnels; `getRemoteConfig`/`updateRemoteConfig` proxy to CF configurations API — **but reject `config_src: 'local'` tunnels with 409** (their config lives on the origin host, configurations API is invalid). `updateConfig` for managed tunnels syncs ingress/originRequest to the configurations API before saving to DB. Throws `TunnelError` with HTTP status for domain failures
 - Global `app.onError` in `index.ts`: Zod errors → 400, others → `{ error }` JSON 500
-- Cloudflare API client in `packages/server/src/services/cloudflare.ts` — `listTunnels`, `getTunnel`, `createTunnel` (explicitly `config_src: 'cloudflare'`), `getTunnelToken`, `getTunnelConfig`, `updateTunnelConfig` (configurations API for remotely-managed tunnels)
+- Cloudflare API client in `packages/server/src/services/cloudflare.ts` — `listTunnels`, `getTunnel`, `createTunnel` (explicitly `config_src: 'cloudflare'`), `getTunnelToken`, `getTunnelConfig`, `updateTunnelConfig` (configurations API for remotely-managed tunnels); `verifyToken` for account creation
 - cloudflared process manager in `packages/server/src/services/tunnel.ts` — spawns `cloudflared tunnel run`; **two run modes via `TunnelRunMode`**: `{ type: 'token' }` runs `--token <TOKEN>` for remotely-managed tunnels (no config file), `{ type: 'config' }` writes config.yml via `yaml` lib `stringify` (NOT hand-rolled YAML) and runs `--config <path> <name>` for locally-managed tunnels; buffers logs (SSE)
-- Token stored encrypted (AES-256-GCM) in SQLite `Setting` table
-- `getCfTokenAsync()` from `routes/auth.ts` used by all protected routes
+- Account tokens stored encrypted (AES-256-GCM) per account in the `Account` table; decrypted only for CF API calls
 - Prisma singleton in `packages/server/src/prisma.ts` — uses v7 driver adapter (`PrismaBetterSqlite3`), import from `../generated/prisma/client`
 - Prisma CLI config in `packages/server/prisma.config.ts` (Prisma v7; `dotenv` loaded there)
 - **Dev script**: `node --import tsx --watch src/index.ts` (NOT `tsx watch` — fails in `pnpm -r --parallel`)
 
 ## Frontend
 
-- State: Pinia stores in `client/src/stores/` (auth, tunnels, theme)
+- State: Pinia stores in `client/src/stores/` (accounts, tunnels, theme)
 - API client: `client/src/api/index.ts` — wrapper around fetch, supports `{ params: {...} }` for query strings
 - Vite proxies `/api` to `http://localhost:3000`
 - Icons: unplugin-icons with `~icons/mdi/*` and `~icons/lucide/*` imports
 - **Layout**: `App.vue` = `NConfigProvider(:theme) > NGlobalStyle > NMessageProvider > NDialogProvider > NNotificationProvider > NLoadingBarProvider > AppLayout.vue` (sider/menu/theme toggle + RouterView). Theme driven by `stores/theme.ts` (`light` | `dark` | `system`, persisted in localStorage)
-- Router guard in `router/index.ts` redirects to `/settings` when token unconfigured (routes marked `meta.requiresAuth`)
-- `views/TunnelList.vue`: local/remote tabs. Local = DB tunnels (create/start/stop/delete/detail); Remote = live CF API tunnels (load by Account ID, view/edit config via API — not stored in DB); remote rows show management type (remotely/locally managed), locally-managed config edits disabled
+- **Accounts**: `stores/accounts.ts` holds managed accounts and the shared top-level selected account (`selectedAccountId`, default `'all'` = no filter, persisted in localStorage). A shared `NSelect` in the AppLayout header binds to it
+- No auth router guard — pages always accessible; when no accounts exist views show an empty state with a link to Accounts
+- `views/TunnelList.vue`: local/remote tabs. Local = DB tunnels, filtered client-side by the selected account (`'all'` = no filter); create-tunnel modal picks a managed account from a dropdown. Remote = live CF API tunnels (require a specific selected account; `'all'` unsupported); view/edit config via API — not stored in DB; remote rows show management type (remotely/locally managed), locally-managed config edits disabled
+- `views/DnsManager.vue`: loads zones/records for the selected account (`?accountId=`); `'all'`/no account shows a hint to pick one, empty-state link to Accounts when no accounts exist
 - `components/CodeEditor.vue`: CodeMirror editor with `language` (`yaml`|`json`), `dark`, and `readOnly` props (uses `EditorState.readOnly` compartment)
 
 ## Naive UI — Critical Rules
@@ -118,7 +123,8 @@ Prisma + SQLite (Prisma v7). Schema at `packages/server/prisma/schema.prisma`.
 - ✅ Prisma relocated to server + upgraded to v7 (driver adapter, prisma.config.ts)
 - ✅ Phase 4: Config editor complete (JSON/YAML modes, linting, format, save via `yaml`/zod); create-tunnel modal wired; TunnelList NDataTable columns render via `h()` (VNode, not HTML strings)
 - ✅ Phase 5: DNS management complete (zone select, records CRUD via CF, tunnel-linked records persisted to DB)
-- ✅ Phase 6: Polish done — dark/light/system theme toggle (persisted, `stores/theme.ts`, `AppLayout.vue`), route guard redirects to Settings when token unconfigured, route loading bar, CodeEditor follows app theme, sider collapse-aware footer
+- ✅ Phase 6: Polish done — dark/light/system theme toggle (persisted, `stores/theme.ts`, `AppLayout.vue`), route loading bar, CodeEditor follows app theme, sider collapse-aware footer
 - ✅ Phase 7: Remote tunnel management — local/remote tabs; remote tunnels fetched/edited live via CF API (no DB storage); router/service separation (control layer vs business layer)
 - ✅ Phase 8: Remote/locally-managed tunnel split — run remotely-managed tunnels via `--token` (no config.yml); reject `config_src: 'local'` tunnels from configurations API with 409; `updateConfig` syncs to configurations API; remote list shows management type, locally-managed config edits disabled
+- ✅ Phase 9: Per-account management — each managed `Account` has its own API token + account ID + display name; Accounts view + top-level account selector (persisted, default `'all'`); accounts replaced the single `cf_token` Setting (migrated at startup); no auth router guard (empty states link to Accounts); TLS/DNS/tunnel pages filter by selected account; account deletion blocked while local tunnels reference it
 

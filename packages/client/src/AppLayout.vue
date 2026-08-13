@@ -82,73 +82,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <NLayout has-sider position="absolute">
-    <NLayoutSider
-      v-model:collapsed="collapsed"
-      bordered
-      collapse-mode="width"
-      :collapsed-width="64"
-      :width="220"
-      show-trigger
-      content-style="padding: 16px;"
-    >
-      <div class="mb-6 flex items-center gap-2 px-2">
-        <span class="text-primary text-lg font-bold">CFTM</span>
-        <NBadge
-          :type="accountStore.accounts.length > 0 ? 'success' : 'warning'"
-          :value="accountStore.accounts.length"
-          :max="99"
-        />
-      </div>
-      <NMenu
-        :options="menuOptions"
-        :value="$route.path"
-        @update:value="handleMenuUpdate"
-      />
-      <div v-if="!collapsed" class="absolute bottom-4 left-4 right-4 flex flex-col items-center gap-2 text-xs text-gray-400">
-        <div class="flex items-center gap-1">
-          <NButton
-            quaternary
-            size="small"
-            :type="themeStore.mode === 'light' ? 'primary' : 'default'"
-            title="浅色"
-            @click="themeStore.setMode('light')"
-          >
-            <template #icon>
-              <NIcon><IconMdiWhiteBalanceSunny /></NIcon>
-            </template>
-          </NButton>
-          <NButton
-            quaternary
-            size="small"
-            :type="themeStore.mode === 'dark' ? 'primary' : 'default'"
-            title="深色"
-            @click="themeStore.setMode('dark')"
-          >
-            <template #icon>
-              <NIcon><IconMdiWeatherNight /></NIcon>
-            </template>
-          </NButton>
-          <NButton
-            quaternary
-            size="small"
-            :type="themeStore.mode === 'system' ? 'primary' : 'default'"
-            title="跟随系统"
-            @click="themeStore.setMode('system')"
-          >
-            <template #icon>
-              <NIcon><IconMdiThemeLightDark /></NIcon>
-            </template>
-          </NButton>
+  <NLayout position="absolute">
+    <NLayoutHeader bordered class="h-16">
+      <div class="h-full flex items-center px-4">
+        <div class="flex items-center gap-2 px-2">
+          <span class="text-primary text-lg font-bold">CFTM</span>
+          <NBadge
+            :type="accountStore.accounts.length > 0 ? 'success' : 'warning'"
+            :value="accountStore.accounts.length"
+            :max="99"
+          />
         </div>
-        <div>
-          {{ accountStore.accounts.length > 0 ? `${accountStore.accounts.length} 个账户` : '未配置账户' }}
-        </div>
-      </div>
-    </NLayoutSider>
-    <NLayout>
-      <NLayoutHeader bordered content-style="padding: 8px 24px;">
-        <div class="flex items-center justify-end">
+        <div class="ml-a">
           <NSelect
             :value="accountStore.selectedAccountId"
             :options="accountOptions"
@@ -157,7 +102,65 @@ onUnmounted(() => {
             @update:value="handleAccountUpdate"
           />
         </div>
-      </NLayoutHeader>
+      </div>
+    </NLayoutHeader>
+
+    <NLayout has-sider position="absolute" style="top: 4rem">
+      <NLayoutSider
+        v-model:collapsed="collapsed"
+        bordered
+        collapse-mode="width"
+        :collapsed-width="64"
+        :width="220"
+        show-trigger
+        content-style="padding: 16px;"
+      >
+        <NMenu
+          :options="menuOptions"
+          :value="$route.path"
+          @update:value="handleMenuUpdate"
+        />
+        <div v-if="!collapsed" class="absolute bottom-4 left-4 right-4 flex flex-col items-center gap-2 text-xs text-gray-400">
+          <div class="flex items-center gap-1">
+            <NButton
+              quaternary
+              size="small"
+              :type="themeStore.mode === 'light' ? 'primary' : 'default'"
+              title="浅色"
+              @click="themeStore.setMode('light')"
+            >
+              <template #icon>
+                <NIcon><IconMdiWhiteBalanceSunny /></NIcon>
+              </template>
+            </NButton>
+            <NButton
+              quaternary
+              size="small"
+              :type="themeStore.mode === 'dark' ? 'primary' : 'default'"
+              title="深色"
+              @click="themeStore.setMode('dark')"
+            >
+              <template #icon>
+                <NIcon><IconMdiWeatherNight /></NIcon>
+              </template>
+            </NButton>
+            <NButton
+              quaternary
+              size="small"
+              :type="themeStore.mode === 'system' ? 'primary' : 'default'"
+              title="跟随系统"
+              @click="themeStore.setMode('system')"
+            >
+              <template #icon>
+                <NIcon><IconMdiThemeLightDark /></NIcon>
+              </template>
+            </NButton>
+          </div>
+          <div>
+            {{ accountStore.accounts.length > 0 ? `${accountStore.accounts.length} 个账户` : '未配置账户' }}
+          </div>
+        </div>
+      </NLayoutSider>
       <NLayoutContent content-style="padding: 24px;">
         <RouterView />
       </NLayoutContent>

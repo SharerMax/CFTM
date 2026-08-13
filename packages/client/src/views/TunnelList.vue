@@ -20,7 +20,6 @@ import {
 } from 'naive-ui'
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import IconMdiCog from '~icons/mdi/cog'
 import IconMdiPlus from '~icons/mdi/plus'
 import CodeEditor from '../components/CodeEditor.vue'
 import { useAccountStore } from '../stores/accounts'
@@ -162,7 +161,7 @@ async function saveConfig() {
   }
 }
 
-watch(() => accountStore.selectedAccountId, () => {
+watch([() => activeTab.value, () => accountStore.selectedAccountId], () => {
   if (activeTab.value === 'remote' && isRemoteSupported.value)
     loadRemote()
 })
@@ -280,6 +279,8 @@ function handleDelete(tunnel: Tunnel) {
 
 onMounted(() => {
   tunnelStore.fetchTunnels()
+  if (activeTab.value === 'remote' && isRemoteSupported.value)
+    loadRemote()
 })
 </script>
 
@@ -317,12 +318,6 @@ onMounted(() => {
             <span class="text-sm text-gray-500">
               当前账户: {{ accountStore.selectedAccountId === 'all' ? 'All accounts (请选择具体账户)' : (accountStore.selectedAccount?.name || '-') }}
             </span>
-            <NButton :loading="remoteLoading" :disabled="!isRemoteSupported" @click="loadRemote">
-              <template #icon>
-                <IconMdiCog />
-              </template>
-              加载远程隧道
-            </NButton>
           </div>
           <NEmpty
             v-if="!isRemoteSupported"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DataTableColumns } from 'naive-ui'
-import type { RemoteConfig, RemoteTunnel, Tunnel } from '../stores/tunnels'
+import type { RemoteTunnel, Tunnel } from '../stores/tunnels'
 import { createTunnelSchema } from '@cftm/shared/schemas'
 import {
   NButton,
@@ -21,14 +21,12 @@ import {
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import IconMdiPlus from '~icons/mdi/plus'
-import CodeEditor from '../components/CodeEditor.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { useAccountStore } from '../stores/accounts'
-import { useThemeStore } from '../stores/theme'
 import { useTunnelStore } from '../stores/tunnels'
 
 const tunnelStore = useTunnelStore()
 const accountStore = useAccountStore()
-const themeStore = useThemeStore()
 const message = useMessage()
 const dialog = useDialog()
 const router = useRouter()
@@ -41,12 +39,6 @@ const createAccountId = ref<string | null>(null)
 const activeTab = ref('local')
 const remoteLoading = ref(false)
 const remoteTunnels = ref<RemoteTunnel[]>([])
-
-const showConfig = ref(false)
-const configLoading = ref(false)
-const configSaving = ref(false)
-const editingTunnel = ref<RemoteTunnel | null>(null)
-const configText = ref('')
 
 const accountOptions = computed(() =>
   accountStore.accounts.map(a => ({ label: a.name, value: a.id })))
@@ -117,48 +109,8 @@ async function loadRemote() {
   }
 }
 
-async function openConfig(tunnel: RemoteTunnel) {
-  editingTunnel.value = tunnel
-  configLoading.value = true
-  showConfig.value = true
-  try {
-    const config = await tunnelStore.getRemoteConfig(remoteAccountId.value, tunnel.id)
-    configText.value = JSON.stringify(config, null, 2)
-  }
-  catch (e) {
-    message.error(`加载配置失败: ${(e as Error).message}`)
-    showConfig.value = false
-  }
-  finally {
-    configLoading.value = false
-  }
-}
-
-async function saveConfig() {
-  if (!editingTunnel.value)
-    return
-
-  let config: RemoteConfig
-  try {
-    config = JSON.parse(configText.value)
-  }
-  catch {
-    message.error('JSON 格式错误')
-    return
-  }
-
-  configSaving.value = true
-  try {
-    await tunnelStore.updateRemoteConfig(remoteAccountId.value, editingTunnel.value.id, config)
-    message.success('配置已保存')
-    showConfig.value = false
-  }
-  catch (e) {
-    message.error(`保存失败: ${(e as Error).message}`)
-  }
-  finally {
-    configSaving.value = false
-  }
+function openConfig(tunnel: RemoteTunnel) {
+  router.push(`/tunnels/remote/${remoteAccountId.value}/${tunnel.id}`)
 }
 
 watch([() => activeTab.value, () => accountStore.selectedAccountId], () => {
@@ -252,7 +204,7 @@ const remoteColumns: DataTableColumns<RemoteTunnel> = [
           disabled: local,
           onClick: () => openConfig(row),
         }, {
-          default: () => local ? '配置存储在源主机' : '查看/编辑',
+          default: () => local ? '配置存储在源主机' : '编辑',
         }),
       ])
     },
@@ -286,11 +238,11 @@ onMounted(() => {
 
 <template>
   <div>
-    <div class="mb-4 flex items-center justify-between">
-      <h2 class="text-xl font-semibold">
-        Tunnels
-      </h2>
-      <div class="flex items-center gap-2">
+    <PageHeader
+      title="Tunnels"
+      :crumbs="[{ label: '首页', to: '/' }, { label: '隧道' }]"
+    >
+      <template #actions>
         <NButton v-if="accountStore.accounts.length === 0" type="primary" @click="router.push('/accounts')">
           配置账户
         </NButton>
@@ -300,8 +252,8 @@ onMounted(() => {
           </template>
           新建隧道
         </NButton>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <NTabs v-if="accountStore.accounts.length > 0" v-model:value="activeTab" type="line">
       <NTabPane name="local" tab="本地管理">
@@ -359,26 +311,6 @@ onMounted(() => {
         </NButton>
         <NButton type="primary" :loading="creating" @click="handleCreate">
           创建
-        </NButton>
-      </template>
-    </NModal>
-
-    <NModal
-      v-model:show="showConfig"
-      preset="dialog"
-      :title="`配置 - ${editingTunnel?.name || ''}`"
-      style="width: 700px;"
-    >
-      <NSpin v-if="configLoading" />
-      <template v-else>
-        <CodeEditor v-model="configText" language="json" :dark="themeStore.isDark" style="height: 400px;" />
-      </template>
-      <template #action>
-        <NButton @click="showConfig = false">
-          取消
-        </NButton>
-        <NButton type="primary" :loading="configSaving" @click="saveConfig">
-          保存
         </NButton>
       </template>
     </NModal>

@@ -18,7 +18,6 @@ import {
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { parse, stringify } from 'yaml'
-import IconMdiArrowLeft from '~icons/mdi/arrow-left'
 import IconMdiContentSave from '~icons/mdi/content-save'
 import IconMdiDelete from '~icons/mdi/delete'
 import IconMdiFormatAlignLeft from '~icons/mdi/format-align-left'
@@ -26,6 +25,7 @@ import IconMdiPlay from '~icons/mdi/play'
 import IconMdiStop from '~icons/mdi/stop'
 import { api } from '../api'
 import CodeEditor from '../components/CodeEditor.vue'
+import PageHeader from '../components/PageHeader.vue'
 import { useThemeStore } from '../stores/theme'
 import { useTunnelStore } from '../stores/tunnels'
 
@@ -165,17 +165,10 @@ function handleDelete() {
 
 <template>
   <div>
-    <div class="mb-4 flex items-center gap-3">
-      <NButton text @click="router.push('/')">
-        <template #icon>
-          <IconMdiArrowLeft />
-        </template>
-        返回
-      </NButton>
-      <h2 class="text-xl font-semibold">
-        隧道详情
-      </h2>
-    </div>
+    <PageHeader
+      title="隧道详情"
+      :crumbs="[{ label: '首页', to: '/' }, { label: '隧道', to: '/' }, { label: tunnel?.name || '隧道详情' }]"
+    />
 
     <NSpin v-if="loading" />
     <NEmpty v-else-if="!tunnel" description="隧道不存在" />

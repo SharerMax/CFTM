@@ -1,3 +1,4 @@
+import type { RemoteTunnelConfig, TunnelConfig } from '@cftm/shared/types'
 import { defineStore, storeToRefs } from 'pinia'
 import { ref } from 'vue'
 import { api } from '../api'
@@ -9,7 +10,7 @@ export interface Tunnel {
   cloudflareTunnelId: string | null
   status: 'stopped' | 'running' | 'error'
   isRunning: boolean
-  config: { tunnel: string, ingress: { hostname?: string, service: string, path?: string }[] }
+  config: TunnelConfig
   createdAt: string
 }
 
@@ -21,11 +22,7 @@ export interface RemoteTunnel {
   config_src?: 'local' | 'cloudflare'
 }
 
-export interface RemoteConfig {
-  'ingress': { hostname?: string, service: string, path?: string, originRequest?: Record<string, unknown> }[]
-  'originRequest'?: Record<string, unknown>
-  'warp-routing'?: { enabled: boolean }
-}
+export type RemoteConfig = RemoteTunnelConfig
 
 export const useTunnelStore = defineStore('tunnels', () => {
   const tunnels = ref<Tunnel[]>([])

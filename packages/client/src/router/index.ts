@@ -19,6 +19,16 @@ const router = createRouter({
       component: () => import('../views/TunnelLogs.vue'),
     },
     {
+      path: '/tunnels/remote/:accountId/:tunnelId',
+      name: 'remote-tunnel-ingress',
+      component: () => import('../views/RemoteTunnelIngress.vue'),
+    },
+    {
+      path: '/tunnels/remote/:accountId/:tunnelId/ingress/:index',
+      name: 'remote-ingress-edit',
+      component: () => import('../views/RemoteIngressEdit.vue'),
+    },
+    {
       path: '/dns',
       name: 'dns',
       component: () => import('../views/DnsManager.vue'),

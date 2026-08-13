@@ -17,6 +17,7 @@ import {
 } from 'naive-ui'
 import { h, onMounted, reactive, ref } from 'vue'
 import IconMdiPlus from '~icons/mdi/plus'
+import PageHeader from '../components/PageHeader.vue'
 import { useAccountStore } from '../stores/accounts'
 
 const accountStore = useAccountStore()
@@ -160,17 +161,19 @@ onMounted(() => {
 
 <template>
   <div>
-    <div class="mb-4 flex items-center justify-between">
-      <h2 class="text-xl font-semibold">
-        Accounts
-      </h2>
-      <NButton type="primary" @click="openCreate">
-        <template #icon>
-          <IconMdiPlus />
-        </template>
-        新建账户
-      </NButton>
-    </div>
+    <PageHeader
+      title="Accounts"
+      :crumbs="[{ label: '首页', to: '/' }, { label: '账户' }]"
+    >
+      <template #actions>
+        <NButton type="primary" @click="openCreate">
+          <template #icon>
+            <IconMdiPlus />
+          </template>
+          新建账户
+        </NButton>
+      </template>
+    </PageHeader>
 
     <NCard>
       <NSpin v-if="accountStore.loading" />

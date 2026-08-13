@@ -25,6 +25,7 @@ import IconMdiDelete from '~icons/mdi/delete'
 import IconMdiPlus from '~icons/mdi/plus'
 import IconMdiRefresh from '~icons/mdi/refresh'
 import { api } from '../api'
+import PageHeader from '../components/PageHeader.vue'
 import { useAccountStore } from '../stores/accounts'
 import { useTunnelStore } from '../stores/tunnels'
 
@@ -222,32 +223,34 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div class="mb-4 flex items-center justify-between">
-      <h2 class="text-xl font-semibold">
-        DNS 管理
-      </h2>
-      <NSpace v-if="hasSelection">
-        <NSelect
-          v-model:value="zoneId"
-          :options="zoneOptions"
-          placeholder="选择 Zone"
-          style="width: 260px;"
-          clearable
-        />
-        <NButton :disabled="!zoneId" @click="loadRecords">
-          <template #icon>
-            <IconMdiRefresh />
-          </template>
-          刷新
-        </NButton>
-        <NButton type="primary" :disabled="!zoneId" @click="openCreate">
-          <template #icon>
-            <IconMdiPlus />
-          </template>
-          新建记录
-        </NButton>
-      </NSpace>
-    </div>
+    <PageHeader
+      title="DNS 管理"
+      :crumbs="[{ label: '首页', to: '/' }, { label: 'DNS 管理' }]"
+    >
+      <template #actions>
+        <NSpace v-if="hasSelection">
+          <NSelect
+            v-model:value="zoneId"
+            :options="zoneOptions"
+            placeholder="选择 Zone"
+            style="width: 260px;"
+            clearable
+          />
+          <NButton :disabled="!zoneId" @click="loadRecords">
+            <template #icon>
+              <IconMdiRefresh />
+            </template>
+            刷新
+          </NButton>
+          <NButton type="primary" :disabled="!zoneId" @click="openCreate">
+            <template #icon>
+              <IconMdiPlus />
+            </template>
+            新建记录
+          </NButton>
+        </NSpace>
+      </template>
+    </PageHeader>
 
     <NCard>
       <NEmpty

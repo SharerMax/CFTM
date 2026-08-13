@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { NButton, NCard } from 'naive-ui'
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import IconMdiArrowLeft from '~icons/mdi/arrow-left'
+import { useRoute } from 'vue-router'
 import IconMdiClear from '~icons/mdi/delete-sweep'
+import PageHeader from '../components/PageHeader.vue'
 
 const route = useRoute()
-const router = useRouter()
 
 const logs = ref<string[]>([])
 const logContainer = ref<HTMLElement | null>(null)
@@ -58,30 +57,27 @@ onUnmounted(() => {
 
 <template>
   <div class="h-full flex flex-col">
-    <div class="mb-4 flex items-center gap-3">
-      <NButton text @click="router.push(`/tunnels/${tunnelId}`)">
-        <template #icon>
-          <IconMdiArrowLeft />
-        </template>
-        返回
-      </NButton>
-      <h2 class="text-xl font-semibold">
-        实时日志
-      </h2>
-      <span
-        :class="connected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-        class="rounded px-2 py-0.5 text-xs"
-      >
-        {{ connected ? '已连接' : '断开' }}
-      </span>
-      <div class="flex-1" />
-      <NButton size="small" @click="clearLogs">
-        <template #icon>
-          <IconMdiClear />
-        </template>
-        清屏
-      </NButton>
-    </div>
+    <PageHeader
+      title="实时日志"
+      :crumbs="[{ label: '首页', to: '/' }, { label: '隧道', to: '/' }, { label: '实时日志' }]"
+    >
+      <template #after-title>
+        <span
+          :class="connected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+          class="rounded px-2 py-0.5 text-xs"
+        >
+          {{ connected ? '已连接' : '断开' }}
+        </span>
+      </template>
+      <template #actions>
+        <NButton size="small" @click="clearLogs">
+          <template #icon>
+            <IconMdiClear />
+          </template>
+          清屏
+        </NButton>
+      </template>
+    </PageHeader>
 
     <NCard class="flex-1 overflow-hidden">
       <div

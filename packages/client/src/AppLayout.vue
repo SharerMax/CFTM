@@ -32,24 +32,24 @@ const collapsed = ref(false)
 
 const menuOptions: MenuOption[] = [
   {
-    label: () => h(RouterLink, { to: '/' }, { default: () => 'Tunnels' }),
+    label: () => h(RouterLink, { to: '/' }, { default: () => '隧道' }),
     key: '/',
     icon: () => h(NIcon, null, { default: () => h(IconMdiTunnel) }),
   },
   {
-    label: () => h(RouterLink, { to: '/dns' }, { default: () => 'DNS' }),
+    label: () => h(RouterLink, { to: '/dns' }, { default: () => 'DNS 管理' }),
     key: '/dns',
     icon: () => h(NIcon, null, { default: () => h(IconMdiDns) }),
   },
   {
-    label: () => h(RouterLink, { to: '/accounts' }, { default: () => 'Accounts' }),
+    label: () => h(RouterLink, { to: '/accounts' }, { default: () => '账户' }),
     key: '/accounts',
     icon: () => h(NIcon, null, { default: () => h(IconMdiAccountGroup) }),
   },
 ]
 
 const accountOptions = computed<SelectOption[]>(() => [
-  { label: 'All accounts', value: 'all' },
+  { label: '全部账户', value: 'all' },
   ...accountStore.accounts.map(a => ({
     label: a.name,
     value: a.id,
@@ -111,13 +111,14 @@ onUnmounted(() => {
         bordered
         collapse-mode="width"
         :collapsed-width="64"
-        :width="220"
+        :width="240"
         show-trigger
-        content-style="padding: 16px;"
       >
         <NMenu
           :options="menuOptions"
           :value="$route.path"
+          :collapsed="collapsed"
+          :collapsed-width="64"
           @update:value="handleMenuUpdate"
         />
         <div v-if="!collapsed" class="absolute bottom-4 left-4 right-4 flex flex-col items-center gap-2 text-xs text-gray-400">

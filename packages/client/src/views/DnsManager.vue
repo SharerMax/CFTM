@@ -182,9 +182,9 @@ function handleDelete(record: DnsRecordView) {
 }
 
 const columns: DataTableColumns<DnsRecordView> = [
-  { title: 'Name', key: 'name' },
-  { title: 'Type', key: 'type', width: 80 },
-  { title: 'Content', key: 'content' },
+  { title: '名称', key: 'name' },
+  { title: '类型', key: 'type', width: 80 },
+  { title: '内容', key: 'content' },
   {
     title: '代理',
     key: 'proxied',

@@ -111,12 +111,12 @@ function handleDelete(account: Account) {
 
 const columns: DataTableColumns<Account> = [
   {
-    title: 'Name',
+    title: '名称',
     key: 'name',
     width: 160,
   },
   {
-    title: 'Account ID',
+    title: '账户 ID',
     key: 'cloudflareAccountId',
     width: 260,
     render(row) {
@@ -126,7 +126,7 @@ const columns: DataTableColumns<Account> = [
     },
   },
   {
-    title: 'Token ID',
+    title: '令牌 ID',
     key: 'cloudflareTokenId',
     width: 240,
     render(row) {
@@ -134,7 +134,7 @@ const columns: DataTableColumns<Account> = [
     },
   },
   {
-    title: 'Created',
+    title: '创建时间',
     key: 'createdAt',
     width: 180,
     render(row) {
@@ -142,7 +142,7 @@ const columns: DataTableColumns<Account> = [
     },
   },
   {
-    title: 'Actions',
+    title: '操作',
     key: 'actions',
     render(row) {
       return h('div', { style: 'display:flex;gap:8px' }, [

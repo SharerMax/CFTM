@@ -169,17 +169,17 @@ watch(() => accountStore.selectedAccountId, () => {
 
 const localColumns: DataTableColumns<Tunnel> = [
   {
-    title: 'Name',
+    title: '名称',
     key: 'name',
     width: 200,
   },
   {
-    title: 'Account ID',
+    title: '账户 ID',
     key: 'accountId',
     width: 280,
   },
   {
-    title: 'Status',
+    title: '状态',
     key: 'status',
     width: 100,
     render(row) {
@@ -193,7 +193,7 @@ const localColumns: DataTableColumns<Tunnel> = [
     },
   },
   {
-    title: 'Created',
+    title: '创建时间',
     key: 'createdAt',
     width: 180,
     render(row) {
@@ -201,7 +201,7 @@ const localColumns: DataTableColumns<Tunnel> = [
     },
   },
   {
-    title: 'Actions',
+    title: '操作',
     key: 'actions',
     render(row) {
       return h('div', { style: 'display:flex;gap:8px' }, [
@@ -214,12 +214,12 @@ const localColumns: DataTableColumns<Tunnel> = [
 
 const remoteColumns: DataTableColumns<RemoteTunnel> = [
   {
-    title: 'Name',
+    title: '名称',
     key: 'name',
     width: 200,
   },
   {
-    title: 'Tunnel ID',
+    title: '隧道 ID',
     key: 'id',
     width: 280,
   },
@@ -233,7 +233,7 @@ const remoteColumns: DataTableColumns<RemoteTunnel> = [
     },
   },
   {
-    title: 'Created',
+    title: '创建时间',
     key: 'created_at',
     width: 180,
     render(row) {
@@ -241,7 +241,7 @@ const remoteColumns: DataTableColumns<RemoteTunnel> = [
     },
   },
   {
-    title: 'Actions',
+    title: '操作',
     key: 'actions',
     render(row) {
       const local = row.config_src === 'local'

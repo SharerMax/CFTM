@@ -5,8 +5,12 @@ import {
   NButton,
   NCard,
   NDataTable,
+  NDescriptions,
+  NDescriptionsItem,
+  NDivider,
   NEmpty,
   NSpin,
+  NTag,
   useDialog,
   useMessage,
 } from 'naive-ui'
@@ -38,6 +42,8 @@ const saving = ref(false)
 
 const rows = ref<IngressRow[]>([])
 
+const catchAll = ref<{ hostname?: string, service: string, path?: string } | null>(null)
+
 const ingressRules = computed(() =>
   rows.value.map(r => ({
     hostname: r.hostname || undefined,
@@ -49,7 +55,11 @@ async function load() {
   loading.value = true
   try {
     const config = await tunnelStore.getRemoteConfig(accountId.value, tunnelId.value)
-    rows.value = (config.ingress || []).map((r, index) => ({
+    const ingress = config.ingress || []
+    const rules = [...ingress]
+    const last = rules.pop()
+    catchAll.value = last ?? null
+    rows.value = rules.map((r, index) => ({
       index,
       hostname: r.hostname,
       service: r.service,
@@ -146,7 +156,7 @@ async function save() {
     const config = await tunnelStore.getRemoteConfig(accountId.value, tunnelId.value)
     await tunnelStore.updateRemoteConfig(accountId.value, tunnelId.value, {
       ...config,
-      ingress: ingressRules.value,
+      ingress: [...ingressRules.value, ...(catchAll.value ? [catchAll.value] : [])],
     })
     message.success('配置已保存')
     await load()
@@ -207,6 +217,27 @@ onMounted(async () => {
         <p class="mt-2 text-xs text-gray-500">
           点击规则行的"编辑"进入详细配置；每条规则支持 hostname / path / service 及各项 origin 参数。
         </p>
+
+        <NDivider />
+
+        <div class="mb-2 flex items-center gap-2">
+          <span class="text-sm font-medium">兜底规则（Catch-all）</span>
+          <NTag size="small" type="warning">
+            匹配所有流量
+          </NTag>
+          <div class="flex-1" />
+          <NButton size="small" text type="primary" @click="editRow(rows.length)">
+            编辑
+          </NButton>
+        </div>
+        <p v-if="!catchAll" class="text-sm text-gray-500">
+          暂无兜底规则
+        </p>
+        <NDescriptions v-else :column="1" bordered size="small">
+          <NDescriptionsItem label="Service">
+            {{ catchAll.service }}
+          </NDescriptionsItem>
+        </NDescriptions>
       </template>
     </NCard>
   </div>

@@ -39,6 +39,9 @@ export interface CfDnsRecord {
   content: string
   proxied: boolean
   ttl: number
+  locked?: boolean
+  comment?: string | null
+  meta?: Record<string, unknown>
 }
 
 export class CloudflareApi {

@@ -1,13 +1,15 @@
+import type { ZoneDTO } from '@cftm/shared/types'
 import { createDnsRecordSchema } from '@cftm/shared/schemas'
 import { Hono } from 'hono'
-import { prisma } from '../prisma'
 import { fail, ok } from '../response'
 import { AccountService } from '../services/accounts'
 import { CloudflareApi } from '../services/cloudflare'
+import { DnsError, DnsService } from '../services/dns'
 
 export const zoneRoutes = new Hono()
 
 const accountService = new AccountService()
+const dnsService = new DnsService()
 
 async function resolveToken(accountId: string): Promise<string | null> {
   return accountService.getTokenByAccountId(accountId)
@@ -31,7 +33,7 @@ zoneRoutes.get('/', async (c) => {
   const cf = new CloudflareApi(token)
   const zones = await cf.listZones()
 
-  return ok(c, zones.map(z => ({
+  return ok(c, zones.map<ZoneDTO>(z => ({
     id: z.id,
     name: z.name,
     status: z.status,
@@ -44,23 +46,18 @@ zoneRoutes.get('/:zoneId/records', async (c) => {
     return fail(c, 400, 'bad_request: accountId is required')
   }
 
-  const token = await resolveToken(accountId)
-  if (!token) {
-    return fail(c, 404, 'account_not_found')
-  }
-
   const zoneId = c.req.param('zoneId')
-  const cf = new CloudflareApi(token)
-  const records = await cf.listDnsRecords(zoneId)
 
-  return ok(c, records.map(r => ({
-    id: r.id,
-    name: r.name,
-    type: r.type,
-    content: r.content,
-    proxied: r.proxied,
-    ttl: r.ttl,
-  })))
+  try {
+    const records = await dnsService.listRecords(accountId, zoneId)
+    return ok(c, records)
+  }
+  catch (e) {
+    if (e instanceof DnsError) {
+      return fail(c, e.status, e.message)
+    }
+    throw e
+  }
 })
 
 zoneRoutes.post('/:zoneId/records', async (c) => {
@@ -69,52 +66,20 @@ zoneRoutes.post('/:zoneId/records', async (c) => {
     return fail(c, 400, 'bad_request: accountId is required')
   }
 
-  const token = await resolveToken(accountId)
-  if (!token) {
-    return fail(c, 404, 'account_not_found')
-  }
-
   const zoneId = c.req.param('zoneId')
   const body = await c.req.json()
-  const input = createDnsRecordSchema.parse(body)
+  const input = createDnsRecordSchema.parse({ zoneId, ...body })
 
-  const cf = new CloudflareApi(token)
-  const zone = await cf.getZone(zoneId)
-  if (!zone) {
-    return fail(c, 404, 'zone_not_found')
+  try {
+    const record = await dnsService.createRecord(accountId, zoneId, input)
+    return ok(c, record, 'created')
   }
-
-  const name = input.name === '@' ? zone.name : `${input.name}.${zone.name}`
-
-  const record = await cf.createDnsRecord(zoneId, {
-    name,
-    type: input.type,
-    content: input.content,
-    proxied: input.proxied,
-  })
-
-  if (input.tunnelId) {
-    await prisma.dnsRecord.create({
-      data: {
-        cloudflareRecordId: record.id,
-        zoneId,
-        name: record.name,
-        type: record.type,
-        content: record.content,
-        proxied: record.proxied,
-        tunnelId: input.tunnelId,
-      },
-    })
+  catch (e) {
+    if (e instanceof DnsError) {
+      return fail(c, e.status, e.message)
+    }
+    throw e
   }
-
-  return ok(c, {
-    id: record.id,
-    name: record.name,
-    type: record.type,
-    content: record.content,
-    proxied: record.proxied,
-    ttl: record.ttl,
-  }, 'created')
 })
 
 zoneRoutes.delete('/:zoneId/records/:recordId', async (c) => {
@@ -123,19 +88,16 @@ zoneRoutes.delete('/:zoneId/records/:recordId', async (c) => {
     return fail(c, 400, 'bad_request: accountId is required')
   }
 
-  const token = await resolveToken(accountId)
-  if (!token) {
-    return fail(c, 404, 'account_not_found')
-  }
-
   const { zoneId, recordId } = c.req.param()
 
-  const cf = new CloudflareApi(token)
-  await cf.deleteDnsRecord(zoneId, recordId)
-
-  await prisma.dnsRecord.deleteMany({
-    where: { cloudflareRecordId: recordId },
-  })
-
-  return ok(c, { success: true }, 'deleted')
+  try {
+    await dnsService.deleteRecord(accountId, zoneId, recordId)
+    return ok(c, { success: true }, 'deleted')
+  }
+  catch (e) {
+    if (e instanceof DnsError) {
+      return fail(c, e.status, e.message)
+    }
+    throw e
+  }
 })

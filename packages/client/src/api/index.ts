@@ -1,3 +1,5 @@
+import type { ApiResponse } from '@cftm/shared/types'
+
 const BASE = '/api'
 
 interface RequestConfig {
@@ -17,12 +19,13 @@ async function request<T>(path: string, init?: RequestInit, params?: Record<stri
     ...init,
   })
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'unknown' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
+  const body = await res.json().catch(() => null) as ApiResponse<T> | null
+
+  if (!body || typeof body.code !== 'number' || body.code !== 0) {
+    throw new Error(body?.message || `HTTP ${res.status}`)
   }
 
-  return res.json() as Promise<T>
+  return body.data as T
 }
 
 export const api = {

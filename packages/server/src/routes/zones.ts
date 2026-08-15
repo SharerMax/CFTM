@@ -78,8 +78,15 @@ zoneRoutes.post('/:zoneId/records', async (c) => {
   const input = createDnsRecordSchema.parse(body)
 
   const cf = new CloudflareApi(token)
+  const zone = await cf.getZone(zoneId)
+  if (!zone) {
+    return c.json({ error: 'zone_not_found' }, 404)
+  }
+
+  const name = input.name === '@' ? zone.name : `${input.name}.${zone.name}`
+
   const record = await cf.createDnsRecord(zoneId, {
-    name: input.name,
+    name,
     type: input.type,
     content: input.content,
     proxied: input.proxied,

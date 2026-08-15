@@ -43,6 +43,11 @@ export class CloudflareApi {
   constructor(private token: string) {}
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const data = await this.requestFull<T>(path, init)
+    return data.result
+  }
+
+  private async requestFull<T>(path: string, init: RequestInit = {}): Promise<CfResponse<T>> {
     const res = await fetch(`${CF_API_BASE}${path}`, {
       ...init,
       headers: {
@@ -58,7 +63,20 @@ export class CloudflareApi {
       throw new Error(data.errors[0]?.message || 'Cloudflare API error')
     }
 
-    return data.result
+    return data
+  }
+
+  private async requestAllPages<T>(path: (page: number) => string): Promise<T[]> {
+    const results: T[] = []
+    let page = 1
+    let totalPages = 1
+    do {
+      const data = await this.requestFull<T[]>(path(page))
+      results.push(...data.result)
+      totalPages = data.result_info?.total_pages ?? 1
+      page += 1
+    } while (page <= totalPages)
+    return results
   }
 
   async verifyToken(): Promise<{ id: string, status: string }> {
@@ -66,7 +84,12 @@ export class CloudflareApi {
   }
 
   async listZones(): Promise<CfZone[]> {
-    return this.request<CfZone[]>('/zones')
+    return this.requestAllPages<CfZone>(page => `/zones?per_page=100&page=${page}`)
+  }
+
+  async getZone(zoneId: string): Promise<CfZone | undefined> {
+    const zones = await this.listZones()
+    return zones.find(z => z.id === zoneId)
   }
 
   async listTunnels(accountId: string): Promise<CfTunnel[]> {
@@ -114,13 +137,26 @@ export class CloudflareApi {
   }
 
   async listDnsRecords(zoneId: string): Promise<CfDnsRecord[]> {
-    return this.request<CfDnsRecord[]>(`/zones/${zoneId}/dns_records`)
+    return this.requestAllPages<CfDnsRecord>(page => `/zones/${zoneId}/dns_records?per_page=100&page=${page}`)
   }
 
-  async createDnsRecord(zoneId: string, record: { name: string, type: string, content: string, proxied: boolean }): Promise<CfDnsRecord> {
+  async createDnsRecord(zoneId: string, record: { name: string, type: string, content: string, proxied: boolean, ttl?: number }): Promise<CfDnsRecord> {
+    const body: Record<string, unknown> = {
+      name: record.name,
+      type: record.type,
+      content: record.content,
+    }
+    if (record.proxied) {
+      body.proxied = true
+      body.ttl = 1
+    }
+    else {
+      body.proxied = false
+      body.ttl = record.ttl ?? 300
+    }
     return this.request<CfDnsRecord>(`/zones/${zoneId}/dns_records`, {
       method: 'POST',
-      body: JSON.stringify(record),
+      body: JSON.stringify(body),
     })
   }
 

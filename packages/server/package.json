@@ -19,6 +19,7 @@
     "better-sqlite3": "catalog:",
     "dotenv": "catalog:",
     "hono": "catalog:",
+    "pino": "catalog:",
     "yaml": "catalog:",
     "zod": "catalog:"
   },

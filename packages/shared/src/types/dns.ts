@@ -17,6 +17,14 @@ export interface ZoneDTO {
   status: string
 }
 
+export type DnsRecordService
+  = { type: 'tunnel', name?: string }
+    | { type: 'worker', name?: string }
+    | { type: 'pages', name?: string }
+    | { type: 'r2', name?: string }
+    | { type: 'managed' }
+    | { type: 'auto' }
+
 export interface DnsRecordView {
   id: string
   name: string
@@ -24,4 +32,7 @@ export interface DnsRecordView {
   content: string
   proxied: boolean
   ttl: number
+  locked?: boolean
+  comment?: string | null
+  service?: DnsRecordService | null
 }

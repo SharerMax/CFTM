@@ -1,6 +1,7 @@
 import type { CreateTunnelInput, UpdateConfigInput } from '@cftm/shared/schemas'
 import type { CfTunnel, CfTunnelConfig } from './cloudflare'
 import { decrypt, encrypt } from '@cftm/shared/crypto'
+import { logger } from '../logger'
 import { prisma } from '../prisma'
 import { AccountService } from './accounts'
 import { CloudflareApi } from './cloudflare'
@@ -139,6 +140,13 @@ export class TunnelService {
       },
     })
 
+    logger.info({
+      tunnelId: tunnel.id,
+      name: tunnel.name,
+      accountId: tunnel.accountId,
+      cloudflareTunnelId: cfTunnel.id,
+    }, 'tunnel_created')
+
     return toDTO(tunnel)
   }
 
@@ -160,6 +168,8 @@ export class TunnelService {
       where: { id },
       data: { config: JSON.stringify(config) },
     })
+
+    logger.info({ tunnelId: id }, 'tunnel_config_updated')
   }
 
   async start(id: string): Promise<void> {
@@ -173,9 +183,14 @@ export class TunnelService {
       const tunnelToken = decrypt(tunnel.encryptedToken!)
       await tunnelManager.start(id, { type: 'token', token: tunnelToken })
       await prisma.tunnel.update({ where: { id }, data: { status: 'running' } })
+      logger.info({ tunnelId: id, name: tunnel.name }, 'tunnel_started')
     }
     catch (e) {
       await prisma.tunnel.update({ where: { id }, data: { status: 'error' } })
+      logger.error({
+        tunnelId: id,
+        error: e instanceof Error ? e.message : String(e),
+      }, 'tunnel_start_failed')
       throw e
     }
   }
@@ -186,6 +201,7 @@ export class TunnelService {
       throw new TunnelError('not_running', 400)
 
     await prisma.tunnel.update({ where: { id }, data: { status: 'stopped' } })
+    logger.info({ tunnelId: id }, 'tunnel_stopped')
   }
 
   async remove(id: string): Promise<void> {
@@ -202,6 +218,8 @@ export class TunnelService {
     }
 
     await prisma.tunnel.delete({ where: { id } })
+
+    logger.info({ tunnelId: id, name: tunnel.name }, 'tunnel_deleted')
   }
 
   getLogs(id: string): string[] {

@@ -1,3 +1,5 @@
+import { logger } from '../logger'
+
 const CF_API_BASE = 'https://api.cloudflare.com/client/v4'
 
 interface CfResponse<T> {
@@ -48,20 +50,52 @@ export class CloudflareApi {
   }
 
   private async requestFull<T>(path: string, init: RequestInit = {}): Promise<CfResponse<T>> {
-    const res = await fetch(`${CF_API_BASE}${path}`, {
-      ...init,
-      headers: {
-        'Authorization': `Bearer ${this.token}`,
-        'Content-Type': 'application/json',
-        ...init.headers,
-      },
-    })
+    const method = init.method || 'GET'
+    const start = performance.now()
 
-    const data = await res.json() as CfResponse<T>
+    let res: Response
+    try {
+      res = await fetch(`${CF_API_BASE}${path}`, {
+        ...init,
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+          ...init.headers,
+        },
+      })
+    }
+    catch (e) {
+      logger.error({
+        method,
+        path,
+        error: e instanceof Error ? e.message : String(e),
+      }, 'cloudflare_request_network_error')
+      throw e
+    }
+
+    const duration = Math.round(performance.now() - start)
+
+    let data: CfResponse<T>
+    try {
+      data = await res.json() as CfResponse<T>
+    }
+    catch {
+      logger.error({ method, path, status: res.status, duration }, 'cloudflare_request_invalid_response')
+      throw new Error('Invalid response from Cloudflare API')
+    }
 
     if (!data.success) {
+      logger.warn({
+        method,
+        path,
+        status: res.status,
+        duration,
+        errors: data.errors,
+      }, 'cloudflare_request_error')
       throw new Error(data.errors[0]?.message || 'Cloudflare API error')
     }
+
+    logger.info({ method, path, status: res.status, duration }, 'cloudflare_request')
 
     return data
   }

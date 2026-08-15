@@ -1,13 +1,14 @@
 import type { CfTunnelConfig } from '../services/cloudflare'
 import { createTunnelSchema, updateConfigSchema } from '@cftm/shared/schemas'
 import { Hono } from 'hono'
+import { fail, ok } from '../response'
 import { TunnelError, TunnelService } from '../services/tunnels'
 
 export const tunnelRoutes = new Hono()
 
 function handleError(c: any, e: unknown) {
   if (e instanceof TunnelError)
-    return c.json({ error: e.message }, e.status)
+    return fail(c, e.status, e.message)
   throw e
 }
 
@@ -19,18 +20,18 @@ const service = new TunnelService()
 
 tunnelRoutes.get('/', async (c) => {
   const tunnels = await service.list()
-  return c.json(tunnels)
+  return ok(c, tunnels)
 })
 
 tunnelRoutes.get('/remote', async (c) => {
   const accountId = getAccountId(c)
   if (!accountId) {
-    return c.json({ error: 'bad_request', message: 'accountId is required' }, 400)
+    return fail(c, 400, 'bad_request: accountId is required')
   }
 
   try {
     const cfTunnels = await service.listRemote(accountId)
-    return c.json(cfTunnels)
+    return ok(c, cfTunnels)
   }
   catch (e) {
     return handleError(c, e)
@@ -41,11 +42,11 @@ tunnelRoutes.get('/remote/config', async (c) => {
   const accountId = getAccountId(c)
   const tunnelId = c.req.query('tunnelId')
   if (!accountId || !tunnelId)
-    return c.json({ error: 'bad_request', message: 'accountId and tunnelId are required' }, 400)
+    return fail(c, 400, 'bad_request: accountId and tunnelId are required')
 
   try {
     const config = await service.getRemoteConfig(accountId, tunnelId)
-    return c.json(config)
+    return ok(c, config)
   }
   catch (e) {
     return handleError(c, e)
@@ -56,14 +57,14 @@ tunnelRoutes.put('/remote/config', async (c) => {
   const accountId = getAccountId(c)
   const tunnelId = c.req.query('tunnelId')
   if (!accountId || !tunnelId)
-    return c.json({ error: 'bad_request', message: 'accountId and tunnelId are required' }, 400)
+    return fail(c, 400, 'bad_request: accountId and tunnelId are required')
 
   const body = await c.req.json()
   const config = body.config as CfTunnelConfig
 
   try {
     const result = await service.updateRemoteConfig(accountId, tunnelId, config)
-    return c.json(result)
+    return ok(c, result, 'updated')
   }
   catch (e) {
     return handleError(c, e)
@@ -76,7 +77,7 @@ tunnelRoutes.post('/', async (c) => {
 
   try {
     const tunnel = await service.create(input)
-    return c.json(tunnel)
+    return ok(c, tunnel, 'created')
   }
   catch (e) {
     return handleError(c, e)
@@ -86,7 +87,7 @@ tunnelRoutes.post('/', async (c) => {
 tunnelRoutes.get('/:id', async (c) => {
   try {
     const tunnel = await service.get(c.req.param('id'))
-    return c.json(tunnel)
+    return ok(c, tunnel)
   }
   catch (e) {
     return handleError(c, e)
@@ -100,7 +101,7 @@ tunnelRoutes.put('/:id/config', async (c) => {
 
   try {
     await service.updateConfig(id, config)
-    return c.json({ success: true })
+    return ok(c, { success: true }, 'updated')
   }
   catch (e) {
     return handleError(c, e)
@@ -110,7 +111,7 @@ tunnelRoutes.put('/:id/config', async (c) => {
 tunnelRoutes.post('/:id/start', async (c) => {
   try {
     await service.start(c.req.param('id'))
-    return c.json({ success: true, status: 'running' })
+    return ok(c, { success: true, status: 'running' }, 'started')
   }
   catch (e) {
     return handleError(c, e)
@@ -120,7 +121,7 @@ tunnelRoutes.post('/:id/start', async (c) => {
 tunnelRoutes.post('/:id/stop', async (c) => {
   try {
     await service.stop(c.req.param('id'))
-    return c.json({ success: true, status: 'stopped' })
+    return ok(c, { success: true, status: 'stopped' }, 'stopped')
   }
   catch (e) {
     return handleError(c, e)
@@ -158,7 +159,7 @@ tunnelRoutes.get('/:id/logs', async (c) => {
 tunnelRoutes.delete('/:id', async (c) => {
   try {
     await service.remove(c.req.param('id'))
-    return c.json({ success: true })
+    return ok(c, { success: true }, 'deleted')
   }
   catch (e) {
     return handleError(c, e)

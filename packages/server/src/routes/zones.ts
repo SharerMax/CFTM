@@ -1,6 +1,7 @@
 import { createDnsRecordSchema } from '@cftm/shared/schemas'
 import { Hono } from 'hono'
 import { prisma } from '../prisma'
+import { fail, ok } from '../response'
 import { AccountService } from '../services/accounts'
 import { CloudflareApi } from '../services/cloudflare'
 
@@ -19,18 +20,18 @@ function getAccountId(c: any): string | null {
 zoneRoutes.get('/', async (c) => {
   const accountId = getAccountId(c)
   if (!accountId) {
-    return c.json({ error: 'bad_request', message: 'accountId is required' }, 400)
+    return fail(c, 400, 'bad_request: accountId is required')
   }
 
   const token = await resolveToken(accountId)
   if (!token) {
-    return c.json({ error: 'account_not_found' }, 404)
+    return fail(c, 404, 'account_not_found')
   }
 
   const cf = new CloudflareApi(token)
   const zones = await cf.listZones()
 
-  return c.json(zones.map(z => ({
+  return ok(c, zones.map(z => ({
     id: z.id,
     name: z.name,
     status: z.status,
@@ -40,19 +41,19 @@ zoneRoutes.get('/', async (c) => {
 zoneRoutes.get('/:zoneId/records', async (c) => {
   const accountId = getAccountId(c)
   if (!accountId) {
-    return c.json({ error: 'bad_request', message: 'accountId is required' }, 400)
+    return fail(c, 400, 'bad_request: accountId is required')
   }
 
   const token = await resolveToken(accountId)
   if (!token) {
-    return c.json({ error: 'account_not_found' }, 404)
+    return fail(c, 404, 'account_not_found')
   }
 
   const zoneId = c.req.param('zoneId')
   const cf = new CloudflareApi(token)
   const records = await cf.listDnsRecords(zoneId)
 
-  return c.json(records.map(r => ({
+  return ok(c, records.map(r => ({
     id: r.id,
     name: r.name,
     type: r.type,
@@ -65,12 +66,12 @@ zoneRoutes.get('/:zoneId/records', async (c) => {
 zoneRoutes.post('/:zoneId/records', async (c) => {
   const accountId = getAccountId(c)
   if (!accountId) {
-    return c.json({ error: 'bad_request', message: 'accountId is required' }, 400)
+    return fail(c, 400, 'bad_request: accountId is required')
   }
 
   const token = await resolveToken(accountId)
   if (!token) {
-    return c.json({ error: 'account_not_found' }, 404)
+    return fail(c, 404, 'account_not_found')
   }
 
   const zoneId = c.req.param('zoneId')
@@ -80,7 +81,7 @@ zoneRoutes.post('/:zoneId/records', async (c) => {
   const cf = new CloudflareApi(token)
   const zone = await cf.getZone(zoneId)
   if (!zone) {
-    return c.json({ error: 'zone_not_found' }, 404)
+    return fail(c, 404, 'zone_not_found')
   }
 
   const name = input.name === '@' ? zone.name : `${input.name}.${zone.name}`
@@ -106,25 +107,25 @@ zoneRoutes.post('/:zoneId/records', async (c) => {
     })
   }
 
-  return c.json({
+  return ok(c, {
     id: record.id,
     name: record.name,
     type: record.type,
     content: record.content,
     proxied: record.proxied,
     ttl: record.ttl,
-  })
+  }, 'created')
 })
 
 zoneRoutes.delete('/:zoneId/records/:recordId', async (c) => {
   const accountId = getAccountId(c)
   if (!accountId) {
-    return c.json({ error: 'bad_request', message: 'accountId is required' }, 400)
+    return fail(c, 400, 'bad_request: accountId is required')
   }
 
   const token = await resolveToken(accountId)
   if (!token) {
-    return c.json({ error: 'account_not_found' }, 404)
+    return fail(c, 404, 'account_not_found')
   }
 
   const { zoneId, recordId } = c.req.param()
@@ -136,5 +137,5 @@ zoneRoutes.delete('/:zoneId/records/:recordId', async (c) => {
     where: { cloudflareRecordId: recordId },
   })
 
-  return c.json({ success: true })
+  return ok(c, { success: true }, 'deleted')
 })

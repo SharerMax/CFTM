@@ -3,6 +3,8 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { ZodError } from 'zod'
+import { logger } from './logger'
+import { fail, ok } from './response'
 import { accountRoutes } from './routes/accounts'
 import { tunnelRoutes } from './routes/tunnels'
 import { zoneRoutes } from './routes/zones'
@@ -13,15 +15,35 @@ const app = new Hono()
 
 app.use('/api/*', cors())
 
+app.use('/api/*', async (c, next) => {
+  const start = performance.now()
+  await next()
+  const duration = Math.round(performance.now() - start)
+  logger.info({
+    method: c.req.method,
+    path: c.req.path,
+    status: c.res.status,
+    duration,
+  }, 'http_request')
+})
+
 app.onError((err, c) => {
   if (err instanceof ZodError) {
-    return c.json({ error: err.issues[0]?.message || 'invalid_input' }, 400)
+    const message = err.issues[0]?.message || 'invalid_input'
+    logger.warn({ path: c.req.path, message }, 'validation_error')
+    return fail(c, 400, message)
   }
-  return c.json({ error: err.message || 'internal_error' }, 500)
+  logger.error({
+    path: c.req.path,
+    method: c.req.method,
+    error: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  }, 'unhandled_error')
+  return fail(c, 500, err instanceof Error ? err.message : 'internal_error')
 })
 
 app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', time: new Date().toISOString() })
+  return ok(c, { status: 'ok', time: new Date().toISOString() })
 })
 
 app.route('/api/accounts', accountRoutes)
@@ -37,7 +59,7 @@ async function main() {
     fetch: app.fetch,
     port,
   }, (info) => {
-    console.warn(`[server] running on http://localhost:${info.port}`)
+    logger.info({ port: info.port }, 'server_started')
   })
 }
 

@@ -1,6 +1,7 @@
 import type { CreateAccountInput, UpdateAccountInput } from '@cftm/shared/schemas'
 import type { AccountDTO } from '@cftm/shared/types'
 import { decrypt, encrypt } from '@cftm/shared/crypto'
+import { logger } from '../logger'
 import { prisma } from '../prisma'
 import { CloudflareApi } from './cloudflare'
 
@@ -43,6 +44,7 @@ export class AccountService {
       tokenId = result.id
     }
     catch {
+      logger.warn({ name: input.name }, 'account_token_verify_failed')
       throw new AccountError('invalid_token', 401)
     }
 
@@ -54,6 +56,8 @@ export class AccountService {
         cloudflareTokenId: tokenId,
       },
     })
+
+    logger.info({ accountId: account.id, name: account.name }, 'account_created')
 
     return toDTO(account)
   }
@@ -83,6 +87,7 @@ export class AccountService {
         tokenId = result.id
       }
       catch {
+        logger.warn({ accountId: id }, 'account_token_verify_failed')
         throw new AccountError('invalid_token', 401)
       }
       data.encryptedToken = encrypt(input.token)
@@ -93,6 +98,8 @@ export class AccountService {
       where: { id },
       data,
     })
+
+    logger.info({ accountId: id, name: updated.name }, 'account_updated')
 
     return toDTO(updated)
   }
@@ -109,6 +116,8 @@ export class AccountService {
       throw new AccountError('account_in_use', 409)
 
     await prisma.account.delete({ where: { id } })
+
+    logger.info({ accountId: id, name: account.name }, 'account_deleted')
   }
 
   async getById(id: string): Promise<{ cloudflareAccountId: string, encryptedToken: string } | null> {

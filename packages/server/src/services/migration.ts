@@ -1,4 +1,5 @@
 import { decrypt, encrypt } from '@cftm/shared/crypto'
+import { logger } from '../logger'
 import { prisma } from '../prisma'
 import { CloudflareApi } from './cloudflare'
 
@@ -15,7 +16,7 @@ export async function migrateLegacyToken(): Promise<void> {
       tokenId = result.id
     }
     catch (e) {
-      console.warn('[migration] cf_token verify failed:', (e as Error).message)
+      logger.warn({ error: (e as Error).message }, 'migration_token_verify_failed')
     }
 
     const existing = await prisma.account.findFirst({
@@ -36,7 +37,7 @@ export async function migrateLegacyToken(): Promise<void> {
     await prisma.setting.delete({ where: { key: 'cf_token' } })
   }
   catch (e) {
-    console.warn('[migration] cf_token could not be decrypted:', (e as Error).message)
+    logger.warn({ error: (e as Error).message }, 'migration_decrypt_failed')
     await prisma.setting.delete({ where: { key: 'cf_token' } })
   }
 }

@@ -7,6 +7,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { stringify } from 'yaml'
+import { logger } from '../logger'
 
 export type TunnelRunMode = { type: 'token', token: string } | { type: 'config', name: string, config: Record<string, unknown> }
 
@@ -25,10 +26,12 @@ class TunnelManager extends EventEmitter {
 
   async start(tunnelId: string, mode: TunnelRunMode): Promise<void> {
     if (this.processes.has(tunnelId)) {
+      logger.warn({ tunnelId }, 'tunnel_already_running')
       throw new Error('Tunnel is already running')
     }
 
     let args: string[]
+    const modeType = mode.type
 
     if (mode.type === 'token') {
       args = [
@@ -95,6 +98,9 @@ class TunnelManager extends EventEmitter {
       tunnelProc.status = code === 0 ? 'running' : 'error'
       tunnelProc.exitCode = code
       this.emit(`exit:${tunnelId}`, code)
+      if (code !== 0) {
+        logger.warn({ tunnelId, exitCode: code }, 'cloudflared_process_exited')
+      }
     })
 
     proc.on('error', (err) => {
@@ -102,9 +108,12 @@ class TunnelManager extends EventEmitter {
       const entry = `[${new Date().toISOString()}] [error] ${err.message}`
       logBuffer.push(entry)
       this.emit(`log:${tunnelId}`, entry)
+      logger.error({ tunnelId, error: err.message }, 'cloudflared_process_error')
     })
 
     this.processes.set(tunnelId, tunnelProc)
+
+    logger.info({ tunnelId, mode: modeType }, 'cloudflared_process_started')
   }
 
   stop(tunnelId: string): boolean {
@@ -115,6 +124,7 @@ class TunnelManager extends EventEmitter {
 
     tunnelProc.process.kill('SIGTERM')
     this.processes.delete(tunnelId)
+    logger.info({ tunnelId }, 'cloudflared_process_stopped')
     return true
   }
 

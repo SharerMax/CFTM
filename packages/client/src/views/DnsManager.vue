@@ -16,6 +16,7 @@ import {
   NSpin,
   NSwitch,
   NTag,
+  NTooltip,
   useDialog,
   useMessage,
 } from 'naive-ui'
@@ -182,10 +183,57 @@ function handleDelete(record: DnsRecordView) {
   })
 }
 
+function renderService(row: DnsRecordView) {
+  const s = row.service
+  if (!s)
+    return null
+
+  let tag: ReturnType<typeof h>
+  let tooltip: string | null = null
+  switch (s.type) {
+    case 'tunnel':
+      tag = h(NTag, { type: 'info', size: 'small' }, { default: () => '隧道' })
+      tooltip = s.name ?? null
+      break
+    case 'worker':
+      tag = h(NTag, { type: 'warning', size: 'small' }, { default: () => 'Worker' })
+      tooltip = s.name ?? null
+      break
+    case 'pages':
+      tag = h(NTag, { type: 'error', size: 'small' }, { default: () => 'Pages' })
+      tooltip = s.name ?? null
+      break
+    case 'r2':
+      tag = h(NTag, { type: 'success', size: 'small' }, { default: () => 'R2' })
+      tooltip = s.name ?? null
+      break
+    case 'managed':
+      tag = h(NTag, { size: 'small' }, { default: () => '服务托管' })
+      break
+    default:
+      tag = h(NTag, { size: 'small' }, { default: () => '自动创建' })
+  }
+
+  if (!tooltip)
+    return tag
+  return h(NTooltip, null, {
+    trigger: () => tag,
+    default: () => tooltip,
+  })
+}
+
 const columns: DataTableColumns<DnsRecordView> = [
   { title: '名称', key: 'name' },
   { title: '类型', key: 'type', width: 80 },
   { title: '内容', key: 'content' },
+  {
+    title: '来源',
+    key: 'service',
+    width: 110,
+    render(row) {
+      return renderService(row)
+    },
+  },
   {
     title: '代理',
     key: 'proxied',
@@ -196,19 +244,34 @@ const columns: DataTableColumns<DnsRecordView> = [
         : h(NTag, { size: 'small' }, { default: () => 'OFF' })
     },
   },
-  { title: 'TTL', key: 'ttl', width: 80 },
+  {
+    title: 'TTL',
+    key: 'ttl',
+    width: 80,
+    render(row) {
+      return row.ttl === 1 ? '自动' : String(row.ttl)
+    },
+  },
   {
     title: '操作',
     key: 'actions',
     width: 100,
     render(row) {
-      return h(NButton, {
+      const btn = h(NButton, {
         size: 'small',
         type: 'error',
+        disabled: !!row.locked,
         onClick: () => handleDelete(row),
       }, {
         default: () => h(IconMdiDelete),
       })
+      if (row.locked) {
+        return h(NTooltip, null, {
+          trigger: () => btn,
+          default: () => '该记录由 Cloudflare 服务托管，无法删除',
+        })
+      }
+      return btn
     },
   },
 ]

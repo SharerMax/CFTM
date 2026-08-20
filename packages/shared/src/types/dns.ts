@@ -33,6 +33,7 @@ export interface DnsRecordView {
   proxied: boolean
   ttl: number
   locked?: boolean
+  readOnly?: boolean
   comment?: string | null
   service?: DnsRecordService | null
 }

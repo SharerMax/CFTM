@@ -28,10 +28,8 @@ import IconMdiRefresh from '~icons/mdi/refresh'
 import { api } from '../api'
 import PageHeader from '../components/PageHeader.vue'
 import { useAccountStore } from '../stores/accounts'
-import { useTunnelStore } from '../stores/tunnels'
 
 const accountStore = useAccountStore()
-const tunnelStore = useTunnelStore()
 const router = useRouter()
 const message = useMessage()
 const dialog = useDialog()
@@ -49,7 +47,6 @@ const form = ref({
   type: 'CNAME' as DnsRecordType,
   content: '',
   proxied: true,
-  tunnelId: null as string | null,
 })
 
 const activeAccountId = computed(() => accountStore.selectedCloudflareAccountId)
@@ -59,9 +56,6 @@ const hasSelection = computed(() => !!(activeAccountId.value))
 
 const zoneOptions = computed(() =>
   zones.value.map(z => ({ label: z.name, value: z.id })))
-
-const tunnelOptions = computed(() =>
-  tunnelStore.tunnels.map(t => ({ label: t.name, value: t.id })))
 
 const typeOptions: SelectOption[] = [
   { label: 'CNAME', value: 'CNAME' },
@@ -119,29 +113,14 @@ watch(() => accountStore.selectedAccountId, () => {
 })
 
 function openCreate() {
-  form.value = { name: '', type: 'CNAME', content: '', proxied: true, tunnelId: null }
+  form.value = { name: '', type: 'CNAME', content: '', proxied: true }
   showCreate.value = true
 }
 
-function handleTunnelChange(value: string | null) {
-  form.value.tunnelId = value
-  if (value) {
-    const tunnel = tunnelStore.tunnels.find(t => t.id === value)
-    if (tunnel?.cloudflareTunnelId) {
-      form.value.type = 'CNAME'
-      form.value.content = `${tunnel.cloudflareTunnelId}.cfargotunnel.com`
-    }
-  }
-}
-
 async function handleCreate() {
-  const payload: Record<string, unknown> = { ...form.value }
-  if (!payload.tunnelId)
-    delete payload.tunnelId
-
   const input = createDnsRecordSchema.safeParse({
     zoneId: zoneId.value!,
-    ...payload,
+    ...form.value,
   })
 
   if (!input.success) {
@@ -192,20 +171,20 @@ function renderService(row: DnsRecordView) {
   let tooltip: string | null = null
   switch (s.type) {
     case 'tunnel':
-      tag = h(NTag, { type: 'info', size: 'small' }, { default: () => '隧道' })
-      tooltip = s.name ?? null
+      tag = h(NTag, { type: 'info', size: 'small' }, { default: () => s.name ?? '隧道' })
+      tooltip = s.name ? '由 Cloudflare Tunnel 托管' : null
       break
     case 'worker':
-      tag = h(NTag, { type: 'warning', size: 'small' }, { default: () => 'Worker' })
-      tooltip = s.name ?? null
+      tag = h(NTag, { type: 'warning', size: 'small' }, { default: () => s.name ? `Worker: ${s.name}` : 'Worker' })
+      tooltip = s.name ? `由 Worker "${s.name}" 托管` : null
       break
     case 'pages':
-      tag = h(NTag, { type: 'error', size: 'small' }, { default: () => 'Pages' })
-      tooltip = s.name ?? null
+      tag = h(NTag, { type: 'error', size: 'small' }, { default: () => s.name ? `Pages: ${s.name}` : 'Pages' })
+      tooltip = s.name ? `由 Pages 项目 "${s.name}" 托管` : null
       break
     case 'r2':
-      tag = h(NTag, { type: 'success', size: 'small' }, { default: () => 'R2' })
-      tooltip = s.name ?? null
+      tag = h(NTag, { type: 'success', size: 'small' }, { default: () => s.name ? `R2: ${s.name}` : 'R2' })
+      tooltip = s.name ? `由 R2 存储桶 "${s.name}" 托管` : null
       break
     case 'managed':
       tag = h(NTag, { size: 'small' }, { default: () => '服务托管' })
@@ -229,7 +208,7 @@ const columns: DataTableColumns<DnsRecordView> = [
   {
     title: '来源',
     key: 'service',
-    width: 110,
+    width: 180,
     render(row) {
       return renderService(row)
     },
@@ -257,15 +236,16 @@ const columns: DataTableColumns<DnsRecordView> = [
     key: 'actions',
     width: 100,
     render(row) {
+      const isReadOnly = !!row.locked || !!row.readOnly
       const btn = h(NButton, {
         size: 'small',
         type: 'error',
-        disabled: !!row.locked,
+        disabled: isReadOnly,
         onClick: () => handleDelete(row),
       }, {
         default: () => h(IconMdiDelete),
       })
-      if (row.locked) {
+      if (isReadOnly) {
         return h(NTooltip, null, {
           trigger: () => btn,
           default: () => '该记录由 Cloudflare 服务托管，无法删除',
@@ -277,7 +257,6 @@ const columns: DataTableColumns<DnsRecordView> = [
 ]
 
 onMounted(async () => {
-  tunnelStore.fetchTunnels()
   if (activeAccountId.value) {
     await loadZones()
   }
@@ -343,19 +322,10 @@ onMounted(async () => {
           <NInput v-model:value="form.name" placeholder="例如: www、api 或 @（根域名）" clearable />
         </NFormItem>
         <NFormItem label="类型">
-          <NSelect v-model:value="form.type" :options="typeOptions" :disabled="!!form.tunnelId" />
+          <NSelect v-model:value="form.type" :options="typeOptions" />
         </NFormItem>
         <NFormItem label="内容">
           <NInput v-model:value="form.content" placeholder="IP 地址或 CNAME 目标" clearable />
-        </NFormItem>
-        <NFormItem label="关联隧道 (可选)">
-          <NSelect
-            v-model:value="form.tunnelId"
-            :options="tunnelOptions"
-            placeholder="选择隧道自动填充 CNAME"
-            clearable
-            @update:value="handleTunnelChange"
-          />
         </NFormItem>
         <NFormItem label="Cloudflare 代理 (橙色云)">
           <NSwitch v-model:value="form.proxied" />

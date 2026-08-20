@@ -44,6 +44,13 @@ export interface CfDnsRecord {
   meta?: Record<string, unknown>
 }
 
+export interface CfWorkerDomain {
+  id: string
+  hostname: string
+  service: string
+  environment: string
+}
+
 export class CloudflareApi {
   constructor(private token: string) {}
 
@@ -175,6 +182,11 @@ export class CloudflareApi {
 
   async listDnsRecords(zoneId: string): Promise<CfDnsRecord[]> {
     return this.requestAllPages<CfDnsRecord>(page => `/zones/${zoneId}/dns_records?per_page=100&page=${page}`)
+  }
+
+  async listWorkerDomains(accountId: string, zoneId?: string): Promise<CfWorkerDomain[]> {
+    const query = zoneId ? `?zone_id=${zoneId}` : ''
+    return this.request<CfWorkerDomain[]>(`/accounts/${accountId}/workers/domains${query}`)
   }
 
   async createDnsRecord(zoneId: string, record: { name: string, type: string, content: string, proxied: boolean, ttl?: number }): Promise<CfDnsRecord> {

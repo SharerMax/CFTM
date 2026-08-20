@@ -1,4 +1,5 @@
 export * from './account'
 export * from './api'
 export * from './dns'
+export * from './settings'
 export * from './tunnel'

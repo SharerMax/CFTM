@@ -6,6 +6,7 @@ import { ZodError } from 'zod'
 import { logger } from './logger'
 import { fail, ok } from './response'
 import { accountRoutes } from './routes/accounts'
+import { settingsRoutes } from './routes/settings'
 import { tunnelRoutes } from './routes/tunnels'
 import { zoneRoutes } from './routes/zones'
 import { migrateLegacyToken } from './services/migration'
@@ -47,6 +48,7 @@ app.get('/api/health', (c) => {
 })
 
 app.route('/api/accounts', accountRoutes)
+app.route('/api/settings', settingsRoutes)
 app.route('/api/tunnels', tunnelRoutes)
 app.route('/api/zones', zoneRoutes)
 

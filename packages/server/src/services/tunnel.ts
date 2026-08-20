@@ -11,6 +11,10 @@ import { logger } from '../logger'
 
 export type TunnelRunMode = { type: 'token', token: string } | { type: 'config', name: string, config: Record<string, unknown> }
 
+export interface TunnelStartOptions {
+  cloudflaredPath?: string
+}
+
 interface TunnelProcess {
   process: ChildProcess
   tunnelId: string
@@ -24,7 +28,7 @@ const MAX_LOG_LINES = 1000
 class TunnelManager extends EventEmitter {
   private processes = new Map<string, TunnelProcess>()
 
-  async start(tunnelId: string, mode: TunnelRunMode): Promise<void> {
+  async start(tunnelId: string, mode: TunnelRunMode, options?: TunnelStartOptions): Promise<void> {
     if (this.processes.has(tunnelId)) {
       logger.warn({ tunnelId }, 'tunnel_already_running')
       throw new Error('Tunnel is already running')
@@ -59,8 +63,9 @@ class TunnelManager extends EventEmitter {
       ]
     }
 
+    const binary = options?.cloudflaredPath?.trim() || 'cloudflared'
     const logBuffer: string[] = []
-    const proc = spawn('cloudflared', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const proc = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] })
 
     const tunnelProc: TunnelProcess = {
       process: proc,
@@ -113,7 +118,7 @@ class TunnelManager extends EventEmitter {
 
     this.processes.set(tunnelId, tunnelProc)
 
-    logger.info({ tunnelId, mode: modeType }, 'cloudflared_process_started')
+    logger.info({ tunnelId, mode: modeType, cloudflaredPath: binary }, 'cloudflared_process_started')
   }
 
   stop(tunnelId: string): boolean {

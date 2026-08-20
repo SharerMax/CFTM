@@ -1,10 +1,12 @@
 import type { CreateTunnelInput, UpdateConfigInput } from '@cftm/shared/schemas'
 import type { CfTunnel, CfTunnelConfig } from './cloudflare'
+import { existsSync } from 'node:fs'
 import { decrypt, encrypt } from '@cftm/shared/crypto'
 import { logger } from '../logger'
 import { prisma } from '../prisma'
 import { AccountService } from './accounts'
 import { CloudflareApi } from './cloudflare'
+import { SettingsService } from './settings'
 import { tunnelManager } from './tunnel'
 
 export class TunnelError extends Error {
@@ -38,6 +40,11 @@ export interface TunnelDTO {
 }
 
 const accountService = new AccountService()
+const settingsService = new SettingsService()
+
+function looksLikePath(value: string): boolean {
+  return /[/\\]/.test(value)
+}
 
 async function cfForAccountId(accountId: string): Promise<CloudflareApi> {
   const token = await accountService.getTokenByAccountId(accountId)
@@ -179,9 +186,13 @@ export class TunnelService {
     if (tunnelManager.isRunning(id))
       throw new TunnelError('already_running', 400)
 
+    const cloudflaredPath = await settingsService.resolveCloudflaredPath()
+    if (looksLikePath(cloudflaredPath) && !existsSync(cloudflaredPath))
+      throw new TunnelError('cloudflared_not_found', 400)
+
     try {
       const tunnelToken = decrypt(tunnel.encryptedToken!)
-      await tunnelManager.start(id, { type: 'token', token: tunnelToken })
+      await tunnelManager.start(id, { type: 'token', token: tunnelToken }, { cloudflaredPath })
       await prisma.tunnel.update({ where: { id }, data: { status: 'running' } })
       logger.info({ tunnelId: id, name: tunnel.name }, 'tunnel_started')
     }

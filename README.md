@@ -6,7 +6,7 @@ Full-stack web app for managing Cloudflare Tunnels and DNS records.
 
 - **Local tunnels** — create, configure (JSON/YAML editor), start/stop `cloudflared`, view live logs (SSE)
 - **Remote tunnels** — browse and edit config via Cloudflare API (no local storage)
-- **DNS management** — zone selection, record CRUD via Cloudflare API, tunnel-linked records persisted locally
+- **DNS management** — zone selection, record CRUD via Cloudflare API, service source annotation (tunnel/worker/pages/R2/managed) with read-only record guard
 - **Dark / light / system theme** with collapse-aware layout
 - Token stored encrypted (AES-256-GCM) at rest
 

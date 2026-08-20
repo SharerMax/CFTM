@@ -40,7 +40,8 @@ const router = createRouter({
     },
     {
       path: '/settings',
-      redirect: '/accounts',
+      name: 'settings',
+      component: () => import('../views/Settings.vue'),
     },
   ],
 })

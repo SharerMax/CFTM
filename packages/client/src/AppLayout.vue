@@ -15,6 +15,7 @@ import {
 import { computed, h, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import IconMdiAccountGroup from '~icons/mdi/account-group'
+import IconMdiCog from '~icons/mdi/cog'
 import IconMdiDns from '~icons/mdi/dns'
 import IconMdiThemeLightDark from '~icons/mdi/theme-light-dark'
 import IconMdiTunnel from '~icons/mdi/tunnel'
@@ -37,7 +38,7 @@ const menuOptions: MenuOption[] = [
     icon: () => h(NIcon, null, { default: () => h(IconMdiTunnel) }),
   },
   {
-    label: () => h(RouterLink, { to: '/dns' }, { default: () => 'DNS 管理' }),
+    label: () => h(RouterLink, { to: '/dns' }, { default: () => 'DNS' }),
     key: '/dns',
     icon: () => h(NIcon, null, { default: () => h(IconMdiDns) }),
   },
@@ -45,6 +46,11 @@ const menuOptions: MenuOption[] = [
     label: () => h(RouterLink, { to: '/accounts' }, { default: () => '账户' }),
     key: '/accounts',
     icon: () => h(NIcon, null, { default: () => h(IconMdiAccountGroup) }),
+  },
+  {
+    label: () => h(RouterLink, { to: '/settings' }, { default: () => '设置' }),
+    key: '/settings',
+    icon: () => h(NIcon, null, { default: () => h(IconMdiCog) }),
   },
 ]
 

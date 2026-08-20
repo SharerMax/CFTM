@@ -266,7 +266,7 @@ onMounted(async () => {
 <template>
   <div>
     <PageHeader
-      title="DNS 管理"
+      title="DNS"
       :crumbs="[{ label: '首页', to: '/' }, { label: 'DNS 管理' }]"
     >
       <template #actions>

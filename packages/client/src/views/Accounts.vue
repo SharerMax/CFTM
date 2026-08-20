@@ -162,7 +162,7 @@ onMounted(() => {
 <template>
   <div>
     <PageHeader
-      title="Accounts"
+      title="账户"
       :crumbs="[{ label: '首页', to: '/' }, { label: '账户' }]"
     >
       <template #actions>
